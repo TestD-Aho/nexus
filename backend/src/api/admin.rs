@@ -6,14 +6,22 @@ use axum::{
     response::Json,
     routing::{get, post, put},
     Router,
+    middleware,
 };
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{AdminStats, CreateRoleRequest, Permission, Role, User};
 use crate::services::app_state::AppState;
+use crate::middleware::security::require_admin;
 
-/// Create admin router
+/// Create admin router with admin-only access
 pub fn router() -> Router<Arc<AppState>> {
+    let admin_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            require_admin(state, request).await
+        },
+    );
+
     Router::new()
         .route("/admin/users", get(list_users))
         .route("/admin/users/:id", put(update_user))
@@ -21,6 +29,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/admin/roles", post(create_role))
         .route("/admin/permissions", get(list_permissions))
         .route("/admin/stats", get(get_stats))
+        .route_layer(admin_layer)
 }
 
 /// List all users (admin only)

@@ -6,19 +6,29 @@ use axum::{
     response::Json,
     routing::{get, put},
     Router,
+    middleware,
 };
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::FeatureFlag;
 use crate::services::app_state::AppState;
+use crate::middleware::security::require_admin;
 
-/// Create system router
+/// Create system router with admin-only access for mutations
 pub fn router() -> Router<Arc<AppState>> {
+    let admin_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            require_admin(state, request).await
+        },
+    );
+
     Router::new()
+        // Public routes
         .route("/system/feature-flags", get(list_feature_flags))
-        .route("/system/feature-flags/:key", put(update_feature_flag))
         .route("/system/maintenance", get(get_maintenance_mode))
-        .route("/system/maintenance", put(set_maintenance_mode))
+        // Protected routes - admin only
+        .route("/system/feature-flags/:key", put(update_feature_flag).route_layer(admin_layer.clone()))
+        .route("/system/maintenance", put(set_maintenance_mode).route_layer(admin_layer))
 }
 
 /// List all feature flags

@@ -13,6 +13,23 @@ export function PageViewPage() {
     loadPage();
   }, [slug]);
 
+  // Dynamic SEO meta tags
+  useEffect(() => {
+    if (page?.page) {
+      const { page: pageData } = page;
+      document.title = pageData.meta_title || `${pageData.title} | Nexus CMS`;
+      
+      // Update meta description
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.name = 'description';
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute('content', pageData.meta_description || pageData.description || '');
+    }
+  }, [page]);
+
   const loadPage = async () => {
     setLoading(true);
     try {
