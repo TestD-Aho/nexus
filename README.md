@@ -1,35 +1,35 @@
 # 🚀 Nexus CMS
 
-> A modular Headless CMS built with Rust (Axum) + React
+> Un CMS Headless modulaire construit avec Rust (Axum) + React
 
 ![Rust](https://img.shields.io/badge/Rust-1.75+-dea584?style=flat&logo=rust)
 ![React](https://img.shields.io/badge/React-18+-61dafb?style=flat&logo=react)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791?style=flat&logo=postgresql)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-Nexus is a powerful, modular headless CMS that separates the content management backend from the frontend presentation layer. Built with Rust for high performance and React for a modern user experience.
+Nexus est un CMS Headless puissant et modulaire qui sépare le backend de gestion de contenu de la couche de présentation frontend. Construit avec Rust pour des performances élevées et React pour une expérience utilisateur moderne.
 
-![Nexus CMS Dashboard](./docs/screenshots/dashboard.png)
+![Nexus CMS Tableau de bord](./capture/dashboard.png)
 
-## ✨ Features
+## ✨ Fonctionnalités
 
 ### Backend (Rust/Axum)
-- 🔐 **JWT Authentication** - Secure token-based auth with refresh tokens
-- 📝 **Page Management** - Create, edit, publish pages with SEO metadata
-- 🧱 **Block System** - Modular content blocks (Hero, RichText, ProjectGrid, etc.)
-- 📁 **Collections** - Custom post types with dynamic schemas
-- 🖼️ **Media Management** - File uploads with drag & drop
-- 👥 **Role-Based Access** - Granular permissions (Super-Architecte, Gestionnaire, VIP, Visiteur)
-- ⚡ **Rate Limiting** - Built-in DDoS protection
-- 🛡️ **Security Headers** - CORS, CSP, HSTS, X-Frame-Options
-- 🔧 **Maintenance Mode** - System-wide maintenance with admin bypass
+- 🔐 **Authentification JWT** - Auth sécurisée par token avec refresh tokens
+- 📝 **Gestion des Pages** - Créer, éditer, publier des pages avec métadonnées SEO
+- 🧱 **Système de Blocs** - Blocs de contenu modulaires (Hero, RichText, ProjectGrid, etc.)
+- 📁 **Collections** - Types de contenu personnalisés avec schémas dynamiques
+- 🖼️ **Gestion des Médias** - Upload de fichiers avec glisser-déposer
+- 👥 **Accès Basé sur les Rôles** - Permissions granulaires (Super-Architecte, Gestionnaire, VIP, Visiteur)
+- ⚡ **Limitation de Débit** - Protection DDoS intégrée
+- 🛡️ **Headers de Sécurité** - CORS, CSP, HSTS, X-Frame-Options
+- 🔧 **Mode Maintenance** - Maintenance système avec contournement admin
 
 ### Frontend (React/Vite)
-- 🎨 **Modern UI** - Clean, responsive design
-- 🔄 **Real-time Preview** - Live block preview while editing
-- 🧭 **Intuitive Navigation** - Sidebar, tabs, and breadcrumbs
-- 📱 **Responsive** - Works on desktop and mobile
-- 🔐 **Protected Routes** - Auth-gated admin areas
+- 🎨 **Interface Moderne** - Design épuré et responsive
+- 🔄 **Aperçu en Temps Réel** - Aperçu des blocs en direct pendant l'édition
+- 🧭 **Navigation Intuitive** - Sidebar, onglets et fil d'Ariane
+- 📱 **Responsive** - Fonctionne sur desktop et mobile
+- 🔐 **Routes Protégées** - Zones admin sécurisées par auth
 
 ## 🏗️ Architecture
 
@@ -56,39 +56,39 @@ Nexus is a powerful, modular headless CMS that separates the content management 
 └───────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## 🚀 Démarrage Rapide
 
-### Prerequisites
+### Prérequis
 - Docker & Docker Compose
-- Node.js 18+ (for frontend development)
-- Rust 1.75+ (for backend development)
+- Node.js 18+ (pour le développement frontend)
+- Rust 1.75+ (pour le développement backend)
 
-### Using Docker Compose
+### Utiliser Docker Compose
 
 ```bash
-# Clone the repository
+# Cloner le dépôt
 git clone https://github.com/TestD-Aho/nexus.git
 cd nexus
 
-# Start all services
+# Démarrer tous les services
 docker-compose up -d
 
-# Access the application
+# Accéder à l'application
 Frontend:  http://localhost:5173
 Backend:   http://localhost:3000
 ```
 
-### Manual Setup
+### Installation Manuelle
 
 #### Backend
 ```bash
 cd backend
 
-# Create environment file
+# Créer le fichier environment
 cp .env.example .env
-# Edit .env with your database URL and JWT secret
+# Éditer .env avec votre URL de base de données et secret JWT
 
-# Run migrations and start server
+# Lancer les migrations et démarrer le serveur
 cargo run
 ```
 
@@ -96,146 +96,145 @@ cargo run
 ```bash
 cd frontend
 
-# Install dependencies
+# Installer les dépendances
 npm install
 
-# Start development server
+# Démarrer le serveur de développement
 npm run dev
 ```
 
-## 📡 API Endpoints
+## 📡 Points de Terminaison API
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/v1/auth/login` | User login | ❌ |
-| `POST` | `/api/v1/auth/register` | User registration | ❌ |
-| `GET` | `/api/v1/auth/me` | Get current user | ✅ |
-| `GET` | `/api/v1/pages` | List all pages | ❌ |
-| `POST` | `/api/v1/pages` | Create page | ✅ |
-| `GET` | `/api/v1/pages/:slug` | Get page by slug | ❌ |
-| `PUT` | `/api/v1/pages/:id` | Update page | ✅ |
-| `DELETE` | `/api/v1/pages/:id` | Delete page | ✅ |
-| `GET` | `/api/v1/blocks` | List blocks | ❌ |
-| `POST` | `/api/v1/blocks` | Create block | ✅ |
-| `POST` | `/api/v1/blocks/reorder` | Reorder blocks | ✅ |
-| `GET` | `/api/v1/media` | List media | ❌ |
-| `POST` | `/api/v1/media/upload` | Upload file | ✅ |
-| `GET` | `/api/v1/admin/stats` | Admin statistics | 🔒 |
-| `GET` | `/api/v1/admin/users` | List users | 🔒 |
-| `PUT` | `/api/v1/system/maintenance` | Toggle maintenance | 🔒 |
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| `POST` | `/api/v1/auth/login` | Connexion utilisateur | ❌ |
+| `POST` | `/api/v1/auth/register` | Inscription utilisateur | ❌ |
+| `GET` | `/api/v1/auth/me` | Obtenir l'utilisateur actuel | ✅ |
+| `GET` | `/api/v1/pages` | Lister toutes les pages | ❌ |
+| `POST` | `/api/v1/pages` | Créer une page | ✅ |
+| `GET` | `/api/v1/pages/:slug` | Obtenir une page par slug | ❌ |
+| `PUT` | `/api/v1/pages/:id` | Mettre à jour une page | ✅ |
+| `DELETE` | `/api/v1/pages/:id` | Supprimer une page | ✅ |
+| `GET` | `/api/v1/blocks` | Lister les blocs | ❌ |
+| `POST` | `/api/v1/blocks` | Créer un bloc | ✅ |
+| `POST` | `/api/v1/blocks/reorder` | Réordonner les blocs | ✅ |
+| `GET` | `/api/v1/media` | Lister les médias | ❌ |
+| `POST` | `/api/v1/media/upload` | Uploader un fichier | ✅ |
+| `GET` | `/api/v1/admin/stats` | Statistiques admin | 🔒 |
+| `GET` | `/api/v1/admin/users` | Lister les utilisateurs | 🔒 |
+| `PUT` | `/api/v1/system/maintenance` | Basculer maintenance | 🔒 |
 
-## 🧱 Block Types
+## 🧱 Types de Blocs
 
-| Block Type | Description |
-|------------|-------------|
-| `HeroHeader` | Full-width hero section with title, subtitle, background |
-| `RichText` | HTML rich text content |
-| `ProjectGrid` | Grid display of projects/portfolio items |
-| `SkillMatrix` | Skills/tags display |
-| `ContactForm` | Contact form with validation |
-| `TestimonialSlider` | Client testimonials/quotes |
+| Type de Bloc | Description |
+|--------------|-------------|
+| `HeroHeader` | Section hero pleine largeur avec titre, sous-titre, fond |
+| `RichText` | Contenu texte riche HTML |
+| `ProjectGrid` | Grille d'affichage des projets/portfolio |
+| `SkillMatrix` | Affichage des compétences/tags |
+| `ContactForm` | Formulaire de contact avec validation |
+| `TestimonialSlider` | Témoignages/clients satisfaits |
 
-## 👥 Roles & Permissions
+## 👥 Rôles et Permissions
 
-| Role | Description | Permissions |
+| Rôle | Description | Permissions |
 |------|-------------|-------------|
-| `Super-Architecte` | Root admin | Full system access |
-| `Gestionnaire` | Content manager | Pages, blocks, media, collections |
-| `VIP` | Premium user | Read public content |
-| `Visiteur` | Anonymous visitor | Read public content |
+| `Super-Architecte` | Admin root | Accès système complet |
+| `Gestionnaire` | Gestionnaire de contenu | Pages, blocs, médias, collections |
+| `VIP` | Utilisateur premium | Lecture contenu public |
+| `Visiteur` | Visiteur anonyme | Lecture contenu public |
 
-## 🖥️ Screenshots
+## 🖥️ Captures d'Écran
 
-### Login Page
-![Login](./docs/screenshots/login.png)
+### Page de Connexion
+![Connexion](./capture/login.png)
 
-### Admin Dashboard
-![Dashboard](./docs/screenshots/dashboard.png)
+### Tableau de Bord Admin
+![Tableau de bord](./capture/dashboard.png)
 
-### Page Editor with Block Builder
-![Page Editor](./docs/screenshots/page-editor.png)
+### Éditeur de Page avec Constructeur de Blocs
+![Éditeur de page](./capture/page-editor.png)
 
-### Media Library
-![Media Library](./docs/screenshots/media-library.png)
+### Bibliothèque de Médias
+![Médiathèque](./capture/media-library.png)
 
-### Public Page
-![Public Page](./docs/screenshots/public-page.png)
+### Page Publique
+![Page publique](./capture/public-page.png)
 
-## 🛠️ Tech Stack
+## 🛠️ Stack Technique
 
 ### Backend
 - **Runtime**: Rust
 - **Framework**: Axum
-- **Database**: PostgreSQL
+- **Base de données**: PostgreSQL
 - **ORM**: SQLx
-- **Auth**: JWT (Argon2 hashing)
+- **Auth**: JWT (hachage Argon2)
 - **Validation**: serde
 
 ### Frontend
 - **Framework**: React 18
-- **Build Tool**: Vite
+- **Outil de build**: Vite
 - **Routing**: React Router 6
-- **HTTP Client**: Axios
-- **Styling**: Custom CSS
+- **Client HTTP**: Axios
+- **Styling**: CSS personnalisé
 
 ### Infrastructure
-- **Container**: Docker
+- **Conteneur**: Docker
 - **Orchestration**: Docker Compose
 
-## 📁 Project Structure
+## 📁 Structure du Projet
 
 ```
 nexus/
 ├── backend/
 │   ├── src/
-│   │   ├── api/          # API routes
-│   │   ├── db/           # Database & migrations
-│   │   ├── middleware/   # Security & rate limiting
-│   │   ├── models/       # Data models
-│   │   ├── services/     # Business logic
+│   │   ├── api/          # Routes API
+│   │   ├── db/           # Base de données et migrations
+│   │   ├── middleware/   # Sécurité et limitation de débit
+│   │   ├── models/       # Modèles de données
+│   │   ├── services/    # Logique métier
 │   │   └── utils/        # Helpers
 │   ├── Cargo.toml
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── api/          # API client
-│   │   ├── components/   # Reusable components
+│   │   ├── api/          # Client API
+│   │   ├── components/   # Composants réutilisables
 │   │   ├── context/      # React context
-│   │   ├── pages/        # Page components
-│   │   └── App.jsx       # Main app
+│   │   ├── pages/        # Composants de pages
+│   │   └── App.jsx       # Application principale
 │   ├── package.json
 │   └── Dockerfile
-├── docs/
-│   └── screenshots/      # README images
+├── capture/              # Captures d'écran
 ├── docker-compose.yml
 └── README.md
 ```
 
 ## 🔧 Configuration
 
-### Environment Variables (Backend)
+### Variables d'Environnement (Backend)
 
-| Variable | Description | Default |
+| Variable | Description | Défaut |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `JWT_SECRET` | Secret key for JWT signing | Required |
-| `NEXUS_HOST` | Server host | `0.0.0.0` |
-| `NEXUS_PORT` | Server port | `3000` |
-| `NEXUS_UPLOAD_DIR` | Upload directory | `./uploads` |
-| `NEXUS_MAX_UPLOAD_SIZE` | Max upload size (bytes) | `10485760` |
+| `DATABASE_URL` | Chaîne de connexion PostgreSQL | Requis |
+| `JWT_SECRET` | Clé secrète pour la signature JWT | Requis |
+| `NEXUS_HOST` | Hôte du serveur | `0.0.0.0` |
+| `NEXUS_PORT` | Port du serveur | `3000` |
+| `NEXUS_UPLOAD_DIR` | Répertoire d'upload | `./uploads` |
+| `NEXUS_MAX_UPLOAD_SIZE` | Taille max upload (octets) | `10485760` |
 
-## 📄 License
+## 📄 Licence
 
-MIT License - see [LICENSE](LICENSE) for details.
+Licence MIT - voir [LICENSE](LICENSE) pour les détails.
 
-## 🤝 Contributing
+## 🤝 Contribuer
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Forker le dépôt
+2. Créer votre branche de fonctionnalité (`git checkout -b feature/feature-incroyable`)
+3. Commiter vos changements (`git commit -m 'Ajouter une feature incroyable'`)
+4. Pousser vers la branche (`git push origin feature/feature-incroyable`)
+5. Ouvrir une Pull Request
 
 ---
 
-<p align="center">Built with ❤️ using Rust + React</p>
+<p align="center">Construit avec ❤️ avec Rust + React</p>
