@@ -6,24 +6,34 @@ use axum::{
     response::Json,
     routing::{get, post, put, delete},
     Router,
+    middleware,
 };
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{Collection, CollectionItem, CreateCollectionItemRequest, CreateCollectionRequest, UpdateCollectionItemRequest};
 use crate::services::app_state::AppState;
+use crate::middleware::security::authenticate;
 
-/// Create collections router
+/// Create collections router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
+    let auth_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            authenticate(state, request).await
+        },
+    );
+
     Router::new()
+        // Public routes - anyone can read
         .route("/collections", get(list_collections))
-        .route("/collections", post(create_collection))
         .route("/collections/:name", get(get_collection))
-        .route("/collections/:name/items", post(create_item_in_collection))
-        .route("/collections/:name/items/:id", put(update_item_in_collection))
-        .route("/collections/:name/items/:id", delete(delete_item_in_collection))
+        // Protected routes - require auth
+        .route("/collections", post(create_collection).route_layer(auth_layer.clone()))
+        .route("/collections/:name/items", post(create_item_in_collection).route_layer(auth_layer.clone()))
+        .route("/collections/:name/items/:id", put(update_item_in_collection).route_layer(auth_layer.clone()))
+        .route("/collections/:name/items/:id", delete(delete_item_in_collection).route_layer(auth_layer))
 }
 
-/// List all collections
+/// List all collections (public)
 pub async fn list_collections(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Collection>>, StatusCode> {
@@ -36,7 +46,7 @@ pub async fn list_collections(
     .map(Json)
 }
 
-/// Create collection
+/// Create collection (protected)
 pub async fn create_collection(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateCollectionRequest>,
@@ -66,7 +76,7 @@ pub async fn create_collection(
     Ok(Json(collection))
 }
 
-/// Get collection by name and its items
+/// Get collection by name and its items (public)
 pub async fn get_collection(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -96,7 +106,7 @@ pub async fn get_collection(
     })))
 }
 
-/// Create item in collection
+/// Create item in collection (protected)
 pub async fn create_item_in_collection(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -136,7 +146,7 @@ pub async fn create_item_in_collection(
     Ok(Json(item))
 }
 
-/// Update item in collection
+/// Update item in collection (protected)
 pub async fn update_item_in_collection(
     State(state): State<Arc<AppState>>,
     Path((_name, id)): Path<(String, Uuid)>,
@@ -153,7 +163,7 @@ pub async fn update_item_in_collection(
     .map(Json)
 }
 
-/// Delete item from collection
+/// Delete item from collection (protected)
 pub async fn delete_item_in_collection(
     State(state): State<Arc<AppState>>,
     Path((_name, id)): Path<(String, Uuid)>,

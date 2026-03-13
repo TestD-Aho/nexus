@@ -6,12 +6,14 @@ use axum::{
     response::Json,
     routing::{get, post, put, delete},
     Router,
+    middleware,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{Block, CreateBlockRequest, ReorderBlocksRequest, UpdateBlockRequest};
 use crate::services::app_state::AppState;
+use crate::middleware::security::authenticate;
 
 #[derive(Deserialize)]
 pub struct BlockQuery {
@@ -19,15 +21,23 @@ pub struct BlockQuery {
     pub status: Option<String>,
 }
 
-/// Create blocks router
+/// Create blocks router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
+    let auth_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            authenticate(state, request).await
+        },
+    );
+
     Router::new()
+        // Public routes - anyone can read
         .route("/blocks", get(list_blocks))
-        .route("/blocks", post(create_block))
         .route("/blocks/:id", get(get_block))
-        .route("/blocks/:id", put(update_block))
-        .route("/blocks/:id", delete(delete_block))
-        .route("/blocks/reorder", post(reorder_blocks))
+        // Protected routes - require auth
+        .route("/blocks", post(create_block).route_layer(auth_layer.clone()))
+        .route("/blocks/:id", put(update_block).route_layer(auth_layer.clone()))
+        .route("/blocks/:id", delete(delete_block).route_layer(auth_layer.clone()))
+        .route("/blocks/reorder", post(reorder_blocks).route_layer(auth_layer))
 }
 
 /// List blocks (optionally filtered by page)
@@ -78,7 +88,7 @@ pub async fn get_block(
     .map(Json)
 }
 
-/// Create new block
+/// Create new block (protected)
 pub async fn create_block(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateBlockRequest>,
@@ -131,7 +141,7 @@ pub async fn create_block(
     Ok(Json(block))
 }
 
-/// Update block
+/// Update block (protected)
 pub async fn update_block(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -166,7 +176,7 @@ pub async fn update_block(
     .map(Json)
 }
 
-/// Delete block
+/// Delete block (protected)
 pub async fn delete_block(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -180,7 +190,7 @@ pub async fn delete_block(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Reorder blocks
+/// Reorder blocks (protected)
 pub async fn reorder_blocks(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ReorderBlocksRequest>,

@@ -5,8 +5,9 @@ use nexus_core::{
     services::{config::Config, app_state::AppState},
     db::{create_pool, run_migrations},
     api,
+    middleware::rate_limit,
 };
-use axum::Router;
+use axum::{Router, middleware};
 use std::sync::Arc;
 use tower_http::cors::{CorsLayer, Any};
 use tower_http::services::ServeDir;
@@ -52,9 +53,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build main router
+    // Build main router with rate limiting
     let mut app = Router::new()
         .nest("/api/v1", api::router(state.clone()))
+        .layer(middleware::from_fn_with_state(state.clone(), rate_limit::layer))
         .layer(cors);
 
     // Serve static files from upload directory (if not in production)

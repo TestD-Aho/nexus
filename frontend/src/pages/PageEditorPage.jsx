@@ -31,20 +31,23 @@ export function PageEditorPage() {
 
   const loadPage = async () => {
     try {
-      const [pageRes, blocksRes] = await Promise.all([
-        pages.get(slug),
-        blocksApi.list({ page_id: slug }), // Note: should use page ID
-      ]);
-      setPage(pageRes.data.page);
+      // 1. Get page by slug first
+      const pageRes = await pages.get(slug);
+      const pageData = pageRes.data.page;
+      
+      // 2. Get blocks using the page ID (UUID)
+      const blocksRes = await blocksApi.list({ page_id: pageData.id });
+      
+      setPage(pageData);
       setBlocks(blocksRes.data);
       setForm({
-        slug: pageRes.data.page.slug,
-        title: pageRes.data.page.title,
-        description: pageRes.data.page.description || '',
-        is_published: pageRes.data.page.is_published,
-        is_home: pageRes.data.page.is_home,
-        meta_title: pageRes.data.page.meta_title || '',
-        meta_description: pageRes.data.page.meta_description || '',
+        slug: pageData.slug,
+        title: pageData.title,
+        description: pageData.description || '',
+        is_published: pageData.is_published,
+        is_home: pageData.is_home,
+        meta_title: pageData.meta_title || '',
+        meta_description: pageData.meta_description || '',
       });
     } catch (err) {
       console.error('Failed to load page:', err);

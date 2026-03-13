@@ -25,7 +25,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('nexus_token');
-      window.location.href = '/login';
+      // Only redirect to login if we're in admin area
+      if (window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

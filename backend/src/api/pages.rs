@@ -6,26 +6,36 @@ use axum::{
     response::Json,
     routing::{get, post, put, delete},
     Router,
+    middleware,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{CreatePageRequest, Page, UpdatePageRequest};
 use crate::services::app_state::AppState;
+use crate::middleware::security::authenticate;
 
 #[derive(Deserialize)]
 pub struct PageQuery {
     pub published: Option<bool>,
 }
 
-/// Create pages router
+/// Create pages router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
+    let auth_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            authenticate(state, request).await
+        },
+    );
+
     Router::new()
+        // Public routes - anyone can read
         .route("/pages", get(list_pages))
-        .route("/pages", post(create_page))
         .route("/pages/:slug", get(get_page))
-        .route("/pages/:id", put(update_page))
-        .route("/pages/:id", delete(delete_page))
+        // Protected routes - require auth
+        .route("/pages", post(create_page).route_layer(auth_layer.clone()))
+        .route("/pages/:id", put(update_page).route_layer(auth_layer.clone()))
+        .route("/pages/:id", delete(delete_page).route_layer(auth_layer))
 }
 
 /// List all pages
@@ -109,7 +119,7 @@ pub async fn get_page(
     })))
 }
 
-/// Create new page
+/// Create new page (protected)
 pub async fn create_page(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreatePageRequest>,
@@ -143,7 +153,7 @@ pub async fn create_page(
     Ok(Json(page))
 }
 
-/// Update page
+/// Update page (protected)
 pub async fn update_page(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -186,7 +196,7 @@ pub async fn update_page(
     Ok(Json(page))
 }
 
-/// Delete page
+/// Delete page (protected)
 pub async fn delete_page(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,

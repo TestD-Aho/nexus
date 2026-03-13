@@ -6,21 +6,31 @@ use axum::{
     response::Json,
     routing::{get, post, delete},
     Router,
+    middleware,
 };
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::Media;
 use crate::services::app_state::AppState;
+use crate::middleware::security::authenticate;
 
-/// Create media router
+/// Create media router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
+    let auth_layer = middleware::from_fn_with_state(
+        |state, request| async move {
+            authenticate(state, request).await
+        },
+    );
+
     Router::new()
+        // Public route - anyone can list
         .route("/media", get(list_media))
-        .route("/media/upload", post(upload_media))
-        .route("/media/:id", delete(delete_media))
+        // Protected routes - require auth
+        .route("/media/upload", post(upload_media).route_layer(auth_layer.clone()))
+        .route("/media/:id", delete(delete_media).route_layer(auth_layer))
 }
 
-/// List all media
+/// List all media (public)
 pub async fn list_media(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Media>>, StatusCode> {
@@ -33,7 +43,7 @@ pub async fn list_media(
     .map(Json)
 }
 
-/// Upload media
+/// Upload media (protected)
 pub async fn upload_media(
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
@@ -99,7 +109,7 @@ pub async fn upload_media(
     Ok(Json(media))
 }
 
-/// Delete media
+/// Delete media (protected)
 pub async fn delete_media(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
