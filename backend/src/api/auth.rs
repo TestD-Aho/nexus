@@ -6,11 +6,14 @@ use axum::{
     response::Json,
     routing::{post, get},
     Router,
+    body::Body,
+    extract::Request,
 };
 use std::sync::Arc;
 use crate::models::{AuthResponse, LoginRequest, RegisterRequest};
 use crate::services::app_state::AppState;
 use crate::services::auth::AuthService;
+use crate::middleware::security::authenticate;
 
 /// Create auth router
 pub fn router() -> Router<Arc<AppState>> {
@@ -72,13 +75,21 @@ pub async fn refresh(
         })
 }
 
-/// Get current user info
+/// Get current user info - requires authentication
 pub async fn me(
     State(state): State<Arc<AppState>>,
+    request: Request,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // This would require auth middleware to extract claims
-    // Simplified for now
+    // Extract and validate the JWT token
+    let claims = authenticate(State(state), request).await.map_err(|e| {
+        tracing::warn!("Auth failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
+    
     Ok(Json(serde_json::json!({
-        "message": "Use JWT token in Authorization header"
+        "id": claims.sub,
+        "email": claims.email,
+        "role": claims.role,
+        "role_id": claims.role_id
     })))
 }
