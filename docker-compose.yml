@@ -26,8 +26,11 @@ services:
     environment:
       DATABASE_URL: postgres://nexus:nexus_secret@postgres:5432/nexus
       JWT_SECRET: nexus-super-secret-jwt-key-change-in-production
-      HOST: 0.0.0.0
-      PORT: 3000
+      NEXUS_HOST: 0.0.0.0
+      NEXUS_PORT: 3000
+      NEXUS_UPLOAD_DIR: /app/uploads
+    volumes:
+      - nexus_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,3 +48,4 @@ services:
 
 volumes:
   postgres_data:
+  nexus_uploads:

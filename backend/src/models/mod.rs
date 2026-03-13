@@ -151,7 +151,7 @@ pub struct Block {
     pub schedule_start: Option<DateTime<Utc>>,
     pub schedule_end: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Collection (Custom Post Type)

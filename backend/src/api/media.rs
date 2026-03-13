@@ -10,15 +10,14 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::Media;
-use crate::AppState;
-use crate::middleware::security::authenticate;
+use crate::services::app_state::AppState;
 
 /// Create media router
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/media", get(list_media))
-        .route("/api/v1/media/upload", post(upload_media))
-        .route("/api/v1/media/:id", delete(delete_media))
+        .route("/media", get(list_media))
+        .route("/media/upload", post(upload_media))
+        .route("/media/:id", delete(delete_media))
 }
 
 /// List all media
@@ -39,13 +38,6 @@ pub async fn upload_media(
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<Json<Media>, StatusCode> {
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Note: In production, you'd handle file upload properly
-    // This is a simplified version for demonstration
-    
     let field = multipart.next_field().await
         .map_err(|_| StatusCode::BAD_REQUEST)?
         .ok_or(StatusCode::BAD_REQUEST)?;
@@ -70,13 +62,15 @@ pub async fn upload_media(
     let stored_filename = format!("{}.{}", media_id, extension);
     let url = format!("/uploads/{}", stored_filename);
 
-    // Save file to disk (simplified)
+    // Save file to disk
     let upload_path = std::path::Path::new(&state.config.upload_dir);
-    std::fs::create_dir_all(upload_path)
+    tokio::fs::create_dir_all(upload_path)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     
     let file_path = upload_path.join(&stored_filename);
-    std::fs::write(&file_path, &data)
+    tokio::fs::write(&file_path, &data)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Save to database
@@ -110,10 +104,6 @@ pub async fn delete_media(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
     // Get filename
     let filename: Option<String> = sqlx::query(
         "SELECT filename FROM media WHERE id = $1"
@@ -127,7 +117,7 @@ pub async fn delete_media(
     // Delete file
     if let Some(fname) = filename {
         let file_path = std::path::Path::new(&state.config.upload_dir).join(&fname);
-        let _ = std::fs::remove_file(file_path);
+        let _ = tokio::fs::remove_file(file_path).await;
     }
 
     // Delete from database

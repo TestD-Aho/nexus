@@ -10,17 +10,17 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{Collection, CollectionItem, CreateCollectionItemRequest, CreateCollectionRequest, UpdateCollectionItemRequest};
-use crate::AppState;
-use crate::middleware::security::authenticate;
+use crate::services::app_state::AppState;
 
 /// Create collections router
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/collections", get(list_collections))
-        .route("/api/v1/collections/:name", get(get_collection))
-        .route("/api/v1/collections/:name", post(create_item_in_collection))
-        .route("/api/v1/collections/:name/:id", put(update_item_in_collection))
-        .route("/api/v1/collections/:name/:id", delete(delete_item_in_collection))
+        .route("/collections", get(list_collections))
+        .route("/collections", post(create_collection))
+        .route("/collections/:name", get(get_collection))
+        .route("/collections/:name/items", post(create_item_in_collection))
+        .route("/collections/:name/items/:id", put(update_item_in_collection))
+        .route("/collections/:name/items/:id", delete(delete_item_in_collection))
 }
 
 /// List all collections
@@ -36,16 +36,46 @@ pub async fn list_collections(
     .map(Json)
 }
 
+/// Create collection
+pub async fn create_collection(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateCollectionRequest>,
+) -> Result<Json<Collection>, StatusCode> {
+    let id = Uuid::new_v4();
+    
+    sqlx::query(
+        "INSERT INTO collections (id, name, slug, description, schema, created_at) VALUES ($1, $2, $3, $4, $5, NOW())"
+    )
+    .bind(id)
+    .bind(&payload.name)
+    .bind(&payload.slug)
+    .bind(&payload.description)
+    .bind(&payload.schema)
+    .execute(&state.db_pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let collection = sqlx::query_as::<_, Collection>(
+        "SELECT * FROM collections WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_one(&state.db_pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(collection))
+}
+
 /// Get collection by name and its items
 pub async fn get_collection(
     State(state): State<Arc<AppState>>,
-    Path((name,)): Path<(String,)>,
+    Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     // Get collection
     let collection: Collection = sqlx::query_as(
         "SELECT * FROM collections WHERE slug = $1 OR name = $1"
     )
-    .bind(&name.0)
+    .bind(&name)
     .fetch_optional(&state.db_pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -72,10 +102,6 @@ pub async fn create_item_in_collection(
     Path(name): Path<String>,
     Json(payload): Json<CreateCollectionItemRequest>,
 ) -> Result<Json<CollectionItem>, StatusCode> {
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
     // Get collection
     let collection: Collection = sqlx::query_as(
         "SELECT * FROM collections WHERE slug = $1 OR name = $1"
@@ -113,13 +139,9 @@ pub async fn create_item_in_collection(
 /// Update item in collection
 pub async fn update_item_in_collection(
     State(state): State<Arc<AppState>>,
-    Path((name, id)): Path<(String, Uuid)>,
+    Path((_name, id)): Path<(String, Uuid)>,
     Json(payload): Json<UpdateCollectionItemRequest>,
 ) -> Result<Json<CollectionItem>, StatusCode> {
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
     sqlx::query(
         "UPDATE collection_items SET data = $2, updated_at = NOW() WHERE id = $1 RETURNING *"
     )
@@ -136,10 +158,6 @@ pub async fn delete_item_in_collection(
     State(state): State<Arc<AppState>>,
     Path((_name, id)): Path<(String, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
     sqlx::query("DELETE FROM collection_items WHERE id = $1")
         .bind(id)
         .execute(&state.db_pool)

@@ -11,27 +11,26 @@ use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{Block, CreateBlockRequest, ReorderBlocksRequest, UpdateBlockRequest};
-use crate::AppState;
-use crate::middleware::security::authenticate;
+use crate::services::app_state::AppState;
 
-/// Create blocks router
-pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/api/v1/blocks", get(list_blocks))
-        .route("/api/v1/blocks", post(create_block))
-        .route("/api/v1/blocks/:id", get(get_block))
-        .route("/api/v1/blocks/:id", put(update_block))
-        .route("/api/v1/blocks/:id", delete(delete_block))
-        .route("/api/v1/blocks/reorder", post(reorder_blocks))
-}
-
-/// List blocks (optionally filtered by page)
 #[derive(Deserialize)]
 pub struct BlockQuery {
     pub page_id: Option<Uuid>,
     pub status: Option<String>,
 }
 
+/// Create blocks router
+pub fn router() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/blocks", get(list_blocks))
+        .route("/blocks", post(create_block))
+        .route("/blocks/:id", get(get_block))
+        .route("/blocks/:id", put(update_block))
+        .route("/blocks/:id", delete(delete_block))
+        .route("/blocks/reorder", post(reorder_blocks))
+}
+
+/// List blocks (optionally filtered by page)
 pub async fn list_blocks(
     State(state): State<Arc<AppState>>,
     Query(query): Query<BlockQuery>,
@@ -84,29 +83,6 @@ pub async fn create_block(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<CreateBlockRequest>,
 ) -> Result<Json<Block>, StatusCode> {
-    // Require authentication
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Check permission
-    let has_permission = sqlx::query_as::<_, (bool,)>(
-        r#"SELECT EXISTS(
-            SELECT 1 FROM role_permissions rp
-            JOIN permissions p ON rp.permission_id = p.id
-            WHERE rp.role_id = $1 AND p.action = 'create' AND p.resource = 'blocks'
-        )"#
-    )
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(|r| r.0)
-    .unwrap_or(false);
-
-    if !has_permission {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
     let block_id = Uuid::new_v4();
     
     // Get next order index for the page
@@ -161,29 +137,6 @@ pub async fn update_block(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateBlockRequest>,
 ) -> Result<Json<Block>, StatusCode> {
-    // Require authentication
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Check permission
-    let has_permission = sqlx::query_as::<_, (bool,)>(
-        r#"SELECT EXISTS(
-            SELECT 1 FROM role_permissions rp
-            JOIN permissions p ON rp.permission_id = p.id
-            WHERE rp.role_id = $1 AND p.action = 'update' AND p.resource = 'blocks'
-        )"#
-    )
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(|r| r.0)
-    .unwrap_or(false);
-
-    if !has_permission {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
     sqlx::query(
         r#"UPDATE blocks SET
             block_type = COALESCE($2, block_type),
@@ -218,29 +171,6 @@ pub async fn delete_block(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // Require authentication
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Check permission
-    let has_permission = sqlx::query_as::<_, (bool,)>(
-        r#"SELECT EXISTS(
-            SELECT 1 FROM role_permissions rp
-            JOIN permissions p ON rp.permission_id = p.id
-            WHERE rp.role_id = $1 AND p.action = 'delete' AND p.resource = 'blocks'
-        )"#
-    )
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(|r| r.0)
-    .unwrap_or(false);
-
-    if !has_permission {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
     sqlx::query("DELETE FROM blocks WHERE id = $1")
         .bind(id)
         .execute(&state.db_pool)
@@ -255,30 +185,7 @@ pub async fn reorder_blocks(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<ReorderBlocksRequest>,
 ) -> Result<Json<Vec<Block>>, StatusCode> {
-    // Require authentication
-    let _claims = authenticate(State(state.clone()), axum::extract::Request::new(
-        axum::body::Body::empty()
-    )).await.map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Check permission
-    let has_permission = sqlx::query_as::<_, (bool,)>(
-        r#"SELECT EXISTS(
-            SELECT 1 FROM role_permissions rp
-            JOIN permissions p ON rp.permission_id = p.id
-            WHERE rp.role_id = $1 AND p.action = 'reorder' AND p.resource = 'blocks'
-        )"#
-    )
-    .fetch_optional(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(|r| r.0)
-    .unwrap_or(false);
-
-    if !has_permission {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
-    // Update order for each block in a transaction
+    // Update order for each block
     for item in &payload.blocks {
         sqlx::query(
             "UPDATE blocks SET order_index = $2, updated_at = NOW() WHERE id = $1"
@@ -291,10 +198,11 @@ pub async fn reorder_blocks(
     }
 
     // Return all reordered blocks
+    let ids: Vec<Uuid> = payload.blocks.iter().map(|b| b.id).collect();
     let blocks = sqlx::query_as::<_, Block>(
         "SELECT * FROM blocks WHERE id = ANY($1) ORDER BY order_index"
     )
-    .bind(payload.blocks.iter().map(|b| b.id).collect::<Vec<_>>())
+    .bind(&ids)
     .fetch_all(&state.db_pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

@@ -2,7 +2,7 @@
 
 use crate::models::Claims;
 use crate::services::auth::AuthService;
-use crate::AppState;
+use crate::services::app_state::AppState;
 use axum::{
     body::Body,
     extract::{Request, State},

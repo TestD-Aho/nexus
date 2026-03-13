@@ -10,18 +10,17 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{AdminStats, CreateRoleRequest, Permission, Role, User};
-use crate::AppState;
-use crate::middleware::security::require_admin;
+use crate::services::app_state::AppState;
 
 /// Create admin router
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/admin/users", get(list_users))
-        .route("/api/v1/admin/users/:id", put(update_user))
-        .route("/api/v1/admin/roles", get(list_roles))
-        .route("/api/v1/admin/roles", post(create_role))
-        .route("/api/v1/admin/permissions", get(list_permissions))
-        .route("/api/v1/admin/stats", get(get_stats))
+        .route("/admin/users", get(list_users))
+        .route("/admin/users/:id", put(update_user))
+        .route("/admin/roles", get(list_roles))
+        .route("/admin/roles", post(create_role))
+        .route("/admin/permissions", get(list_permissions))
+        .route("/admin/stats", get(get_stats))
 }
 
 /// List all users (admin only)

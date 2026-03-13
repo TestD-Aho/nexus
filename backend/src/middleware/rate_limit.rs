@@ -1,6 +1,6 @@
 //! Rate Limiting Middleware
 
-use crate::AppState;
+use crate::services::app_state::AppState;
 use axum::{
     body::Body,
     extract::{Request, State},

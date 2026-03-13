@@ -7,19 +7,18 @@ use axum::{
     routing::{post, get},
     Router,
 };
-use axum::extract::Path;
 use std::sync::Arc;
 use crate::models::{AuthResponse, LoginRequest, RegisterRequest};
-use crate::AppState;
+use crate::services::app_state::AppState;
 use crate::services::auth::AuthService;
 
 /// Create auth router
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/auth/login", post(login))
-        .route("/api/v1/auth/register", post(register))
-        .route("/api/v1/auth/refresh", post(refresh))
-        .route("/api/v1/auth/me", get(me))
+        .route("/auth/login", post(login))
+        .route("/auth/register", post(register))
+        .route("/auth/refresh", post(refresh))
+        .route("/auth/me", get(me))
 }
 
 /// Login endpoint

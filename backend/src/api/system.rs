@@ -10,15 +10,15 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::FeatureFlag;
-use crate::AppState;
+use crate::services::app_state::AppState;
 
 /// Create system router
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/system/feature-flags", get(list_feature_flags))
-        .route("/api/v1/system/feature-flags/:key", put(update_feature_flag))
-        .route("/api/v1/system/maintenance", get(get_maintenance_mode))
-        .route("/api/v1/system/maintenance", put(set_maintenance_mode))
+        .route("/system/feature-flags", get(list_feature_flags))
+        .route("/system/feature-flags/:key", put(update_feature_flag))
+        .route("/system/maintenance", get(get_maintenance_mode))
+        .route("/system/maintenance", put(set_maintenance_mode))
 }
 
 /// List all feature flags
