@@ -1,0 +1,2521 @@
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\config\database.php
+
+  Class: Database
+    [  10] -> public static function getConfig()
+    [  21] -> public static function getConnection()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveAdminController.php
+
+  Class: ArchiveAdminController
+    [  13] -> public function __construct($db = null)
+    [  21] -> public function candidatures()
+    [  43] -> public function reclamations()
+    [  64] -> private function getCandidaturesArchives($anneeId)
+    [  89] -> private function getStatsCandidatures($anneeId)
+    [ 106] -> private function getReclamationsArchives($anneeId)
+    [ 128] -> private function getStatsReclamations($anneeId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveController.php
+
+  Class: ArchiveController
+    [  18] -> public function __construct()
+    [  27] -> public function index()
+    [  62] -> public function viewStudentFile()
+    [  99] -> public function updateStudentFile()
+    [ 153] -> public function importArchive()
+    [ 211] -> public function showImportResult()
+    [ 233] -> public function exportHistory()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveDocumentController.php
+
+  Class: ArchiveDocumentController
+    [  14] -> public function __construct($db = null)
+    [  22] -> public function index()
+    [  47] -> public function visionneuse()
+    [  76] -> public function telecharger()
+    [ 105] -> public function telechargerGroupe()
+    [ 145] -> private function getDocumentsArchives($anneeId, $type = null)
+    [ 218] -> private function getCheminDocument($type, $id)
+    [ 258] -> private function getPvFinalDocuments($anneeId)
+    [ 311] -> private function hydrateStudentLabels(array &$documents)
+    [ 358] -> private function resolveCandidateYears($anneeId, $baseDir)
+    [ 392] -> private function extractMatriculeFromPvFinalFilename($filename)
+    [ 402] -> private function encodeFileId($path)
+    [ 408] -> private function decodeFileId($id)
+    [ 429] -> private function isPathInside($path, $basePath)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveEtudiantController.php
+
+  Class: ArchiveEtudiantController
+    [  16] -> public function __construct($db = null)
+    [  26] -> public function index()
+    [  52] -> public function fiche($matricule)
+    [  89] -> public function parcours($matricule)
+    [ 108] -> public function exportCsv()
+    [ 145] -> private function getEtudiantsArchives($anneeId, $filters)
+    [ 194] -> private function getEtudiantComplet($matricule, $anneeId)
+    [ 206] -> private function getParcoursEtudiant($matricule)
+    [ 219] -> private function getSoutenancesEtudiant($matricule)
+    [ 231] -> private function getDocumentsEtudiant($matricule)
+    [ 254] -> private function getReclamationsEtudiant($matricule)
+    [ 266] -> private function getParcoursChronologique($matricule)
+    [ 318] -> private function getSpecialites()
+    [ 324] -> private function logAction($action, $statut)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveHubController.php
+
+  Class: ArchiveHubController
+    [  17] -> public function __construct($db = null)
+    [  27] -> public function index()
+    [ 118] -> private function loadVueEnsemble($anneeId)
+    [ 142] -> private function loadEtudiants($anneeId)
+    [ 171] -> private function loadSoutenances($anneeId)
+    [ 193] -> private function loadJurys($anneeId)
+    [ 217] -> private function loadDocuments($anneeId)
+    [ 239] -> private function loadCandidatures($anneeId)
+    [ 261] -> private function loadReclamations($anneeId)
+    [ 283] -> private function loadStatistiques($anneeId)
+    [ 301] -> public function changeYear()
+    [ 340] -> private function getCountEtudiants($anneeId)
+    [ 356] -> private function getCountSoutenances($anneeId)
+    [ 373] -> private function getCountJurys($anneeId)
+    [ 391] -> private function getCountJurysDetailed($anneeId)
+    [ 408] -> private function getCountDocuments($anneeId)
+    [ 425] -> private function getCountCandidatures($anneeId)
+    [ 442] -> private function getCountReclamations($anneeId)
+    [ 459] -> private function getTauxReussite($anneeId)
+    [ 478] -> private function getMoyenneGenerale($anneeId)
+    [ 496] -> private function getJoursSoutenance($anneeId)
+    [ 513] -> private function getTimeline($anneeId)
+    [ 585] -> private function logAction($action, $statut)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchivesCompteRenduController.php
+
+  Class: ArchivesCompteRenduController
+    [  12] -> public function __construct()
+    [  18] -> public function index()
+    [  50] -> public function viewArchive()
+    [  74] -> public function deleteArchive()
+    [  95] -> public function searchArchives()
+    [ 114] -> public function exportArchives()
+    [ 142] -> public function telechargerPDF(string $chemin)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchivesDossiersSoutenanceController.php
+
+  Class: ArchivesDossiersSoutenanceController
+    [  19] -> public function __construct()
+    [  30] -> public function getRapportDetails($idRapport)
+    [  38] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ArchiveSoutenanceController.php
+
+  Class: ArchiveSoutenanceController
+    [  16] -> public function __construct($db = null)
+    [  26] -> public function index()
+    [  50] -> public function fiche($numSoutenance)
+    [  78] -> public function jurys()
+    [  97] -> public function exportPdf()
+    [ 122] -> private function getSoutenancesArchives($anneeId, $dateFrom = null, $dateTo = null)
+    [ 161] -> private function getSoutenanceComplete($numSoutenance)
+    [ 176] -> private function getJurySoutenance($numSoutenance)
+    [ 195] -> private function getEvaluationsSoutenance($numEtud)
+    [ 207] -> private function getStatsJurys($anneeId)
+    [ 235] -> private function getSalles()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\AuditController.php
+
+  Class: AuditController
+    [  11] -> public function __construct()
+    [  16] -> public function index()
+    [  57] -> private function handleSpecialActions()
+    [  73] -> public function exportAuditLog()
+    [  97] -> public function cleanupAuditLog()
+    [ 126] -> public function deleteSingleLog()
+    [ 154] -> public function getTablesList()
+    [ 158] -> public function getStatutsList()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\AuthController.php
+
+  Class: AuthController
+    [  10] -> public function __construct($db)
+    [  15] -> public function login($login, $password)
+    [  29] -> public function logout()
+    [  36] -> public function updatePassword($currentPassword, $newPassword, $confirmPassword)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\CandidatureSoutenanceController.php
+
+  Class: CandidatureSoutenanceController
+    [  15] -> public function __construct()
+    [  22] -> public function index()
+    [  82] -> public function demande_candidature()
+    [ 103] -> public function compteRenduRapport()
+    [ 117] -> public function infoStage()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\CriteresEvaluationController.php
+
+  Class: CriteresEvaluationController
+    [  12] -> public function __construct()
+    [  20] -> public function index()
+    [  29] -> public function getAnneesAcademiques()
+    [  52] -> public function getCriteres()
+    [  75] -> public function createCritere()
+    [ 111] -> public function updateCritere()
+    [ 149] -> public function deleteCritere()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DashboardCommissionController.php
+
+  Class: DashboardCommissionController
+    [  27] -> public function __construct()
+    [  36] -> public function getDashboardData()
+    [  44] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DashboardController.php
+
+  Class: DashboardController
+    [  28] -> public function __construct()
+    [  38] -> public function index()
+    [  52] -> public function getDashboardData()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DashboardEnseignantController.php
+
+  Class: DashboardEnseignantController
+    [  28] -> public function __construct()
+    [  38] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DashboardScolariteController.php
+
+  Class: DashboardScolariteController
+    [  34] -> public function __construct()
+    [  44] -> public function getDashboardData()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DashboardSecretaireController.php
+
+  Class: DashboardSecretaireController
+    [  16] -> public function __construct($pdo)
+    [  23] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\DossierAcademiqueController.php
+
+  Class: DossierAcademiqueController
+    [  11] -> public function __construct($pdo)
+    [  16] -> public function index()
+    [  27] -> public function enregsitrer_dossier()
+    [  44] -> public function getDossier()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\EvaluationDossiersController.php
+
+  Class: EvaluationDossiersController
+    [  11] -> public function __construct($pdo)
+    [  16] -> public function index()
+    [  20] -> public function traiterAction()
+    [  93] -> private function validerDossier($id_rapport)
+    [ 106] -> private function rejeterDossier($id_rapport, $commentaire)
+    [ 117] -> private function traiterDecisionCommission($id_rapport, $decision, $commentaire = '')
+    [ 128] -> private function finaliserDecisionCommission($id_rapport)
+    [ 139] -> public function detail($id_rapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\EvaluationSoutenanceController.php
+
+  Class: EvaluationSoutenanceController
+    [  19] -> public function __construct()
+    [  27] -> public function getSoutenancesProgrammeesForView()
+    [  35] -> public function getAnneeAcademiqueCourante()
+    [  43] -> public function getCriteresEvaluation()
+    [  51] -> public function getAnneesAcademiques()
+    [  59] -> public function getEvaluationExistante($numEtu)
+    [  67] -> public function enregistrerEvaluation()
+    [  86] -> public function supprimerEvaluation()
+    [  96] -> public function getCriteresParAnnee()
+    [ 111] -> public function getBaremeCriteres()
+    [ 132] -> public function imprimerPV()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionCandidaturesController.php
+
+  Class: GestionCandidaturesController
+    [  13] -> public function __construct()
+    [  18] -> public function index()
+    [  23] -> public function examinerCandidature()
+    [ 139] -> public function afficherResumeCandidature($num_etu)
+    [ 143] -> public function getLastCandidatureByNumEtu($num_etu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionDossiersCandidaturesController.php
+
+  Class: GestionDossiersCandidaturesController
+    [  11] -> public function __construct()
+    [  17] -> public function index()
+    [  28] -> public function getDetailsRapport($id_rapport)
+    [  33] -> public function telechargerPdf($id_rapport)
+    [  84] -> public function consulterRapport($id_rapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionEtudiantController.php
+
+  Class: GestionEtudiantController
+    [  17] -> public function __construct()
+    [  25] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionRapportController.php
+
+  Class: GestionRapportController
+    [  22] -> public function __construct()
+    [  38] -> private function verifierVariablesSession()
+    [  59] -> private function isEtudiant()
+    [  67] -> public function index()
+    [  89] -> public function creerRapport()
+    [ 157] -> public function traiterCreationRapport()
+    [ 218] -> private function sauvegarderRapport()
+    [ 247] -> private function exporterRapport()
+    [ 330] -> public function suiviRapport($num_etu)
+    [ 337] -> public function commentaireRapport()
+    [ 371] -> private function afficherDetailRapport($id)
+    [ 406] -> public function deleteRapportAjax()
+    [ 448] -> public function getRapportAjax()
+    [ 478] -> private function afficherMessage($message, $type = 'info')
+    [ 483] -> private function afficherErreur($message)
+    [ 489] -> private function verifierDroitsAdmin()
+    [ 496] -> private function sendJsonResponse($data)
+    [ 508] -> public function exporterRapports()
+    [ 532] -> public function enregistrerDepotRapport($id_rapport)
+    [ 540] -> public function supprimer_rapport()
+    [ 589] -> public function getCommentairesAjax()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionReclamationsController.php
+
+  Class: GestionReclamationsController
+    [  15] -> public function __construct()
+    [  31] -> public function index()
+    [  46] -> public function soumettreReclamations()
+    [  60] -> private function traiterSoumissionReclamation()
+    [ 120] -> public function suiviHistoriqueReclamations()
+    [ 152] -> private function afficherMessage($message, $type = 'info')
+    [ 157] -> private function afficherErreur($message)
+    [ 162] -> public function exporterReclamations()
+    [ 203] -> public function getReclamationDetailsAjax()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionReclamationsScolariteController.php
+
+  Class: GestionReclamationsScolariteController
+    [  11] -> public function __construct()
+    [  17] -> public function index()
+    [  23] -> public function changerStatut()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionRhController.php
+
+  Class: GestionRhController
+    [  12] -> public function __construct()
+    [  17] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionSallesController.php
+
+  Class: GestionSallesController
+    [  12] -> public function __construct()
+    [  24] -> public function ajouterOuModifierSalle($postData)
+    [  35] -> public function supprimerSallesMultiples($selectedIds)
+    [  46] -> public function getSallePourModification($idSalle)
+    [  59] -> public function getSallesAvecPagination($search = '', $page = 1, $limit = 10)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionScolariteController.php
+
+  Class: GestionScolariteController
+    [  13] -> public function __construct()
+    [  18] -> public function index()
+    [  65] -> public function enregistrerVersement()
+    [  85] -> public function mettreAJourVersement()
+    [ 105] -> public function enregistrerPaiement()
+    [ 127] -> public function uploadFicheInscription()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\GestionUtilisateurController.php
+
+  Class: GestionUtilisateurController
+    [  15] -> public function __construct()
+    [  24] -> public function checkLoginAvailability()
+    [  45] -> public function index()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\InscriptionController.php
+
+  Class: InscriptionController
+    [  14] -> public function __construct()
+    [  20] -> public function index()
+    [ 131] -> private function traiterInscription()
+    [ 141] -> private function modifierInscription()
+    [ 151] -> private function getEtudiantInfo()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\MenuController.php
+
+  Class: MenuController
+    [  11] -> public function __construct()
+    [  21] -> public function genererMenuHierarchique($idGroupe)
+    [  31] -> public function genererMenuPlat($idGroupe)
+    [  40] -> public function genererMenu($idGroupe)
+    [  52] -> public function verifierAcces($idGroupe, $codeFonctionnalite, $typePermission = 'peut_voir')
+    [  62] -> public function getPermissionsGroupe($idGroupe)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\NotesController.php
+
+  Class: NotesController
+    [  13] -> public function __construct()
+    [  19] -> public function index()
+    [  48] -> public function enregistrerNotes()
+    [  93] -> private function redirectBack()
+    [ 111] -> public function getNotesByEtudiant()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\NotesResultatsController.php
+
+  Class: NotesResultatsController
+    [  11] -> public function __construct()
+    [  16] -> public function index()
+    [  21] -> public function exportPdf()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ParametreController.php
+
+  Class: ParametreController
+    [  12] -> public function __construct()
+    [  18] -> public function gestionAnnees()
+    [  40] -> public function gestionGrade()
+    [  63] -> public function gestionFonctionUtilisateur()
+    [  85] -> public function gestionSpecialite()
+    [ 107] -> public function gestionNiveauEtude()
+    [ 129] -> public function gestionStatutJury()
+    [ 151] -> public function gestionNiveauApprobation()
+    [ 173] -> public function gestionSemestre()
+    [ 195] -> public function gestionNiveauAccesDonnees()
+    [ 217] -> public function gestionTraitement()
+    [ 239] -> public function gestionEntreprise()
+    [ 261] -> public function gestionAction()
+    [ 283] -> public function gestionFonction()
+    [ 305] -> public function gestionMessagerie()
+    [ 327] -> public function gestionAttribution()
+    [ 354] -> public function gestionMenus()
+    [ 375] -> public function gestionReferentielSimple()
+    [ 397] -> public function gestionBaremeCritere()
+    [ 420] -> public function gestionSalles()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\PlanificationSoutenanceController.php
+
+  Class: PlanificationSoutenanceController
+    [  12] -> public function __construct()
+    [  20] -> public function getEtudiantsAvecJuryForView()
+    [  28] -> public function getEtudiantsDisponiblesForView()
+    [  36] -> public function getSallesForView()
+    [  44] -> public function getPlanificationsForView()
+    [  52] -> public function planifierSoutenance()
+    [  73] -> public function supprimerPlanification()
+    [  90] -> public function getPlanification()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ProcessusValidationController.php
+
+  Class: ProcessusValidationController
+    [  17] -> public function __construct()
+    [  26] -> public function getStatistiques()
+    [  34] -> public function getRapportsAvecEvaluations()
+    [  42] -> public function getMembresCommission()
+    [  50] -> public function getDonneesPage()
+    [  58] -> public function verifierIdEnseignant($id_enseignant)
+    [  66] -> public function finaliserRapport($id_rapport, $id_enseignant, $commentaire = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\ProgrammationSoutenanceController.php
+
+  Class: ProgrammationSoutenanceController
+    [  16] -> public function __construct()
+    [  24] -> public function getEnseignantJuryForView()
+    [  32] -> public function getEtudiantsForView()
+    [  40] -> public function getEtudiantsDisponiblesForView()
+    [  48] -> public function getEnseignantsForView()
+    [  56] -> public function getSallesForView()
+    [  64] -> public function getProfesseursTitulairesForView()
+    [  72] -> public function getAttributionsForView()
+    [  80] -> public function getEtudiants()
+    [ 103] -> public function getEnseignants()
+    [ 126] -> public function getProfesseursTitulaires()
+    [ 149] -> public function getSalles()
+    [ 172] -> public function getAttributions()
+    [ 195] -> public function createAttribution()
+    [ 230] -> public function updateAttribution()
+    [ 265] -> public function deleteAttribution()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\RedactionCompteRenduController.php
+
+  Class: RedactionCompteRenduController
+    [  12] -> public function __construct()
+    [  16] -> public function index()
+    [  23] -> public function enregistrer()
+    [  71] -> public function exporterPDF()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\SauvegardeRestaurationController.php
+
+  Class: SauvegardeRestaurationController
+    [  14] -> public function __construct()
+    [  18] -> private function requireAdmin()
+    [  28] -> private function requireCsrf()
+    [  38] -> public function getDbConfig()
+    [  43] -> public function createBackup()
+    [  71] -> public function restoreBackup()
+    [ 107] -> public function restoreBackupWithPHP($filepath, $dbConfig)
+    [ 116] -> public function splitSQL($sql)
+    [ 121] -> public function deleteBackup()
+    [ 151] -> public function downloadBackup()
+    [ 184] -> public function getBackups()
+    [ 189] -> public function index()
+    [ 198] -> public function testRestore($filepath)
+    [ 207] -> public function diagnoseInsertQueries($filepath)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\controllers\VerificationRapportsController.php
+
+  Class: VerificationRapportsController
+    [  13] -> public function __construct()
+    [  19] -> public function index()
+    [  40] -> public function validerRapport()
+    [  54] -> public function rejeterRapport()
+    [  68] -> public function getRapportDetail($id_rapport)
+    [  76] -> public function getDecisionsEvaluation($id_rapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Bootstrap.php
+Namespace: CheckMaster\Core
+
+  Class: Bootstrap
+    [   7] -> public static function init()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Csrf.php
+Namespace: CheckMaster\Core
+
+  Class: Csrf
+    [   9] -> public static function token()
+    [  18] -> public static function validate(?string $token)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Request.php
+Namespace: CheckMaster\Core
+
+  Class: Request
+    [  13] -> public function __construct(array $server, array $query, array $post)
+    [  22] -> public static function fromGlobals()
+    [  27] -> private static function resolvePath(array $server, array $query)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Response.php
+Namespace: CheckMaster\Core
+
+  Class: Response
+    [  12] -> public function __construct(string $body = '', int $status = 200, array $headers = [])
+    [  19] -> public static function redirect(string $location, int $status = 302)
+    [  24] -> public function send()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Router.php
+Namespace: CheckMaster\Core
+
+  Class: Router
+    [  10] -> public function get(string $path, callable $handler)
+    [  15] -> public function post(string $path, callable $handler)
+    [  20] -> public function map(string $method, string $path, callable $handler)
+    [  31] -> public function dispatch(Request $req)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Core\Session.php
+Namespace: CheckMaster\Core
+
+  Class: Session
+    [   7] -> public static function start()
+    [  27] -> public static function regenerate()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\middlewares\PermissionMiddleware.php
+
+  Class: PermissionMiddleware
+    [  17] -> public function __construct()
+    [  31] -> public function checkPageAccess($page, $idGroupe, $action = 'voir')
+    [  81] -> public function requirePermission($page, $idGroupe, $action = 'voir')
+    [  92] -> public function detectAction()
+    [ 136] -> private function denyAccess($action = 'voir')
+    [ 169] -> public function checkPermissionByCode($codeFonctionnalite, $idGroupe, $action = 'voir')
+    [ 179] -> private function isAdminGroup(int $idGroupe)
+    [ 200] -> public function getGroupePermissions($idGroupe)
+    [ 213] -> public function checkSousPageAccess($pageParente, $sousPage, $idGroupe, $action = 'voir')
+    [ 230] -> public function logUnauthorizedAccess($idUtilisateur, $page, $action)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Action.php
+
+  Class: Action
+    [   8] -> public function __construct($db)
+    [  13] -> public function ajouterAction($lib_action)
+    [  19] -> public function updateAction($id_action, $lib_action)
+    [  25] -> public function deleteAction($id_action)
+    [  31] -> public function getActionById($id_action)
+    [  38] -> public function getAllAction()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\AnneeAcademique.php
+
+  Class: AnneeAcademique
+    [   7] -> public function __construct($pdo)
+    [  12] -> public function getAllAnneeAcademiques()
+    [  22] -> public function getAnneeAcademiqueActive()
+    [  37] -> public function getAnneeAcademiqueById($id_annee_acad)
+    [  44] -> public function ajouterAnneeAcademique($date_deb, $date_fin)
+    [  58] -> public function updateAnneeAcademique($id_annee_acad, $date_deb, $date_fin)
+    [  74] -> public function deleteAnneeAcademique($id)
+    [  85] -> public function isAnneeAcademiqueInUse($id)
+    [ 100] -> public function isAnneeAcademiqueExist($id_annee, $date_debut, $date_fin)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Approuver.php
+
+  Class: Approuver
+    [   9] -> public function __construct($pdo)
+    [  14] -> private static function tableExists($pdo, $tableName)
+    [  25] -> private static function columnExists($pdo, $tableName, $columnName)
+    [  39] -> private static function resolveSourceTable($pdo)
+    [  52] -> public static function getByRapport($id_rapport)
+    [ 104] -> public static function getRapportsAvecAvis()
+    [ 141] -> public static function getMembresCommission()
+    [ 151] -> public static function getTousAvis()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Archive.php
+
+  Class: Archive
+    [  12] -> public function __construct($db)
+    [  17] -> private function tableExists($tableName)
+    [  35] -> private function columnExists($tableName, $columnName)
+    [  59] -> private function getRapportDateColumn()
+    [  73] -> private function getRapportDateSelect($alias = 'r')
+    [  82] -> private function getRapportOrderBy($alias = null)
+    [  92] -> private function getProgrammationTable()
+    [  97] -> private function getJuryTable()
+    [ 102] -> private function getJuryRoleTable()
+    [ 107] -> private function getProgrammationIdColumn()
+    [ 112] -> private function getProgrammationJuryColumn()
+    [ 117] -> private function getJuryReferenceColumn()
+    [ 122] -> private function getJuryRoleIdColumn()
+    [ 127] -> private function getJuryRoleLabelColumn()
+    [ 132] -> private function getAcademicYearExpression($studentAlias = 'e', $academicYearAlias = 'aa')
+    [ 144] -> private function normalizeAcademicYearLabel($value)
+    [ 166] -> public function getStudentHistory($anneeAcad = null, $statut = null, $search = null, $limit = 50, $offset = 0)
+    [ 229] -> public function countStudents($anneeAcad = null, $statut = null, $search = null)
+    [ 275] -> public function getStudentCompleteFile($numEtu)
+    [ 311] -> private function getMoyenneM1($numEtu)
+    [ 321] -> private function getMoyenneM2S1($numEtu)
+    [ 330] -> private function getStudentInfo($numEtu)
+    [ 353] -> private function getStageInfo($numEtu)
+    [ 371] -> private function getRapportInfo($numEtu)
+    [ 389] -> private function getEncadrementInfo($numEtu)
+    [ 425] -> private function getSoutenanceInfo($numEtu)
+    [ 473] -> private function getNotesEtudiant($numEtu, $numJury)
+    [ 493] -> public function getJuryHistory($anneeAcad = null, $session = null, $limit = 50, $offset = 0)
+    [ 561] -> public function getGlobalStats()
+    [ 585] -> public function getYearlyEvolution()
+    [ 622] -> public function getMentionsDistribution()
+    [ 665] -> public function getTopEntreprises($limit = 10)
+    [ 693] -> public function getTauxReussite($anneeAcad = null)
+    [ 723] -> public function getMoyenneGenerale($anneeAcad = null)
+    [ 752] -> public function getJoursSoutenance($anneeAcad = null)
+    [ 782] -> public function getTimeline($anneeAcad = null)
+    [ 858] -> public function getAcademicYears()
+    [ 910] -> public function getQuickCounts($anneeAcad = null)
+    [ 918] -> public function updateStudentInfo($numEtu, $data)
+    [ 975] -> private function updateStageInfo($numEtu, $stageData)
+    [ 984] -> private function updateRapportInfo($numEtu, $rapportData)
+    [1015] -> private function updateSoutenanceInfo($numEtu, $soutenanceData)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Attribution.php
+
+  Class: Attribution
+    [  11] -> public function __construct($db)
+    [  18] -> private function resolveExistingTable(array $candidates)
+    [  37] -> public function ajouterAttribution($id_GU, $id_traitement)
+    [  51] -> public function deleteAttribution($id_GU)
+    [  62] -> public function getTraitementsByGroupe($id_GU)
+    [  88] -> public function isTraitementAttribue($id_GU, $id_traitement)
+    [  99] -> public function updateAttribution($id_GU, $id_traitement)
+    [ 108] -> public function getAttributionById($id_attribution)
+    [ 114] -> public function getAllAttributionS()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\AuditLog.php
+
+  Class: AuditLog
+    [   6] -> public function __construct($db)
+    [  10] -> public function getAuditLog($id_utilisateur)
+    [  17] -> public function getAuditLogByAction($action)
+    [  24] -> public function getAuditLogByTable($nom_table)
+    [  31] -> public function getAuditLogByDate($date)
+    [  38] -> public function getAllAuditLog()
+    [  50] -> public function logAction($id_utilisateur, $action, $nom_table, $statut_action, $details = null)
+    [  69] -> public function logCreation($id_utilisateur, $nom_table, $statut_action)
+    [  73] -> public function logModification($id_utilisateur, $nom_table, $statut_action)
+    [  77] -> public function logSuppression($id_utilisateur, $nom_table, $statut_action)
+    [  81] -> public function logConnexion($id_utilisateur, $nom_table, $statut_action)
+    [  85] -> public function logDeconnexion($id_utilisateur, $nom_table, $statut_action)
+    [  89] -> public function logExportation($id_utilisateur, $nom_table, $statut_action)
+    [  93] -> public function logImpression($id_utilisateur, $nom_table, $statut_action)
+    [  97] -> public function logDepot($id_utilisateur, $nom_table, $statut_action)
+    [ 101] -> public function logEvaluation($id_utilisateur, $nom_table, $statut_action)
+    [ 105] -> public function logValidation($id_utilisateur, $nom_table, $statut_action)
+    [ 109] -> public function logRejet($id_utilisateur, $nom_table, $statut_action)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\CandidatureSoutenance.php
+
+  Class: CandidatureSoutenance
+    [   5] -> public static function getStatutByEtudiant($num_etu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Categorie.php
+
+  Class: Categorie
+    [   7] -> public function __construct($pdo)
+    [  15] -> public function getAllCategories()
+    [  26] -> public function getCategorieById($id_categorie)
+    [  38] -> public function getCategorieByCode($code_categorie)
+    [  50] -> public function createCategorie($data)
+    [  70] -> public function updateCategorie($id_categorie, $data)
+    [  94] -> public function deleteCategorie($id_categorie)
+    [ 105] -> public function getCategoriesForGroupe($id_GU)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\CompteRendu.php
+
+  Class: CompteRendu
+    [   6] -> public static function creer($num_etu, $nom_CR, $contenu_CR, $chemin_pdf, $date_CR, $rapports = [])
+    [  23] -> public static function getAllArchives($limit = null, $offset = 0, $search = null, $year = null)
+    [  58] -> public static function getArchiveById($id_CR)
+    [  88] -> public static function getStatsArchives()
+    [ 127] -> public static function deleteArchive($id_CR)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Cours.php
+
+  Class: Cours
+    [   6] -> public function __construct($pdo)
+    [  13] -> public function getCoursByEnseignant($enseignantId)
+    [  40] -> public function getNombreEtudiants($coursId)
+    [  59] -> public function getStatsCoursEnseignant($enseignantId)
+    [  85] -> public function getCoursRecents($enseignantId, $limit = 5)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\CritereEvaluation.php
+
+  Class: CritereEvaluation
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllCriteres()
+    [  31] -> public function getCritereById($id_critere)
+    [  47] -> public function getCritereByCode($code_critere)
+    [  63] -> public function creerCritere($code_critere, $lib_critere)
+    [  78] -> public function modifierCritere($id_critere, $code_critere, $lib_critere)
+    [  93] -> public function supprimerCritere($id_critere)
+    [ 108] -> public function getCriteresAvecBareme($id_annee_acad)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\DossierAcademique.php
+
+  Class: DossierAcademique
+    [   4] -> public function __construct($pdo)
+    [   8] -> public function getByNumEtu($num_etu)
+    [  14] -> public function saveOrUpdate($data)
+    [  62] -> public function deleteByNumEtu($num_etu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Echeance.php
+
+  Class: Echeance
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllEcheances()
+    [  39] -> public function getEcheanceById($id_echeance)
+    [  63] -> public function getEcheancesByInscription($id_inscription)
+    [  81] -> public function getEcheancesByEtudiant($num_etu)
+    [ 102] -> public function creerEcheance($id_inscription, $montant, $date_echeance, $statut_echeance = 'En attente')
+    [ 129] -> public function modifierEcheance($id_echeance, $montant, $date_echeance, $statut_echeance)
+    [ 151] -> public function changerStatut($id_echeance, $statut_echeance)
+    [ 171] -> public function supprimerEcheance($id_echeance)
+    [ 186] -> public function supprimerEcheancesByInscription($id_inscription)
+    [ 201] -> public function getEcheancesEnRetard()
+    [ 227] -> public function getEcheancesAVenir($jours = 30)
+    [ 253] -> public function marquerEcheancesEnRetard()
+    [ 271] -> public static function getStatuts()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Enseignant.php
+
+  Class: Enseignant
+    [  24] -> public function __construct($db)
+    [  30] -> public function getIdEnseignant()
+    [  31] -> public function getNomEnseignant()
+    [  32] -> public function getPrenomEnseignant()
+    [  33] -> public function getEmailEnseignant()
+    [  35] -> public function getIdFonction()
+    [  36] -> public function getDateGrade()
+    [  37] -> public function getDateFonction()
+    [  39] -> public function getIdSpecialite()
+    [  41] -> public function getIdGrade()
+    [  42] -> public function getTypeEnseignant()
+    [  47] -> public function setIdEnseignant($id)
+    [  48] -> public function setNomEnseignant($nom)
+    [  49] -> public function setPrenomEnseignant($prenom)
+    [  50] -> public function setEmailEnseignant($email)
+    [  51] -> public function setIdGrade($id_grade)
+    [  53] -> public function setIdFonction($id_fonction)
+    [  54] -> public function setDateGrade($date_grade)
+    [  55] -> public function setDateFonction($date_fonction)
+    [  57] -> public function setIdSpecialite($id_specialite)
+    [  59] -> public function setTypeEnseignant($type_enseignant)
+    [  61] -> public function getAllEnseignants()
+    [  76] -> public function getEnseignantById($id)
+    [  92] -> public function getEnseignantByLogin($login)
+    [ 108] -> public function ajouterEnseignant($id_enseignant, $nom, $prenom, $email, $id_grade, $id_specialite, $id_fonction, $date_grade, $date_fonction,$type_enseignant)
+    [ 155] -> public function modifierEnseignant($id, $nom, $prenom, $email, $id_grade, $id_specialite, $id_fonction, $date_grade, $date_fonction,$type_enseignant)
+    [ 208] -> public function supprimerEnseignant($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Entreprise.php
+
+  Class: Entreprise
+    [   9] -> public function __construct($db)
+    [  14] -> public function ajouterEntreprise($lib_entreprise, $lib_court = '', $email = '', $telephone = '', $logo = '')
+    [  20] -> public function updateEntreprise($id_entreprise, $lib_entreprise, $lib_court = null, $email = null, $telephone = null, $logo = null)
+    [  48] -> public function deleteEntreprise($id_entreprise)
+    [  54] -> public function getEntrepriseById($id)
+    [  62] -> public function getEntrepriseByLibelle($lib_entreprise)
+    [  69] -> public function getAllEntreprises()
+    [  77] -> public function getLastInsertedId()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Etudiant.php
+
+  Class: Etudiant
+    [   7] -> public function __construct($db)
+    [  12] -> private function getAcademicYearLabelById($id_annee_acad)
+    [  33] -> public function getAllEtudiants($id_annee_acad = null)
+    [  80] -> public function getAllListeEtudiants($id_annee_acad = null)
+    [ 141] -> public function getEtudiantById($num_etu)
+    [ 155] -> public function getEtudiantByLogin($nomUtilisateur)
+    [ 185] -> public function ajouterEtudiant($num_etu, $nom_etu, $prenom_etu, $date_naiss_etu, $genre_etu, $email_etu, $promotion_etu, $id_niveau = null, $id_annee_acad = null, $identifiant_mesrs = null)
+    [ 206] -> public function modifierEtudiant($old_num_etu, $new_num_etu, $nom_etu, $prenom_etu, $date_naiss_etu, $genre_etu, $email_etu, $promotion_etu, $id_niveau = null, $id_annee_acad = null, $identifiant_mesrs = null)
+    [ 236] -> public function supprimerEtudiant($num_etu)
+    [ 249] -> public function getEtudiantsByNiveau($niveauId, $anneeAcadId = null)
+    [ 275] -> public function getCandidature($num_etu)
+    [ 283] -> public function getAllCandidature()
+    [ 301] -> public function getCompteRendu($etudiant_id)
+    [ 309] -> public function traiterCandidature($numEtu, $decision, $commentaire, $id_pers_admin)
+    [ 333] -> public function getNotesEtudiant($numEtu)
+    [ 456] -> public function getInfoStage($numEtu)
+    [ 483] -> public function getEtudiantByNumEtu($numEtu)
+    [ 491] -> public function getSemestreActuel($numEtu)
+    [ 520] -> public function createCandidature($etudiant_id)
+    [ 530] -> public function saveResumeCandidature($id_candidature, $num_etu, $resume, $decision)
+    [ 547] -> public function getResumeCandidature($id_candidature)
+    [ 562] -> public function getCandidatures($num_etu)
+    [ 570] -> public function getLastCandidatureByNumEtu($num_etu)
+    [ 581] -> public function getMoyennesSemestre($numEtu, $id_semestre)
+    [ 629] -> public function getNiveauByEtudiant($num_etu)
+    [ 646] -> public function getByAnnee($id_annee_acad, array $filters = [], $limit = 100, $offset = 0)
+    [ 678] -> public function countByAnnee($id_annee_acad, array $filters = [])
+    [ 704] -> public function getParcours($matricule)
+    [ 798] -> public function getDocuments($matricule, $id_annee_acad = null)
+    [ 875] -> public function getArchiveProfile($matricule, $id_annee_acad = null)
+    [1110] -> private function buildArchiveStudentsQuery($id_annee_acad, array $filters, $countOnly = false)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Evaluation.php
+
+  Class: Evaluation
+    [   6] -> public function __construct($pdo)
+    [  13] -> public function getEvaluationsEnAttente($enseignantId)
+    [  43] -> public function getEvaluationsTerminees($enseignantId)
+    [  73] -> public function getEcheancesEvaluation($enseignantId)
+    [ 102] -> public function getStatsEvaluations($enseignantId)
+    [ 135] -> public function getEvaluationsRecentes($enseignantId, $limit = 5)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\EvaluationRapport.php
+
+  Class: EvaluationRapport
+    [  11] -> public function __construct($pdo = null)
+    [  16] -> private function tableExists($tableName)
+    [  33] -> private function columnExists($tableName, $columnName)
+    [  55] -> private function rapportDateExpr($alias = 'r')
+    [  66] -> private function rapportTitleExpr($alias = 'r')
+    [  77] -> public function ajouterEvaluation($id_rapport, $id_evaluateur, $decision, $commentaire)
+    [  94] -> public function mettreAJourEvaluation($id_evaluation, $decision, $commentaire)
+    [ 112] -> public function evaluationExiste($id_rapport, $id_evaluateur)
+    [ 130] -> public function getEvaluationsRapport($id_rapport)
+    [ 154] -> public function getStatutVotes($id_rapport, $nombreMembresCommission = 4)
+    [ 217] -> public function getRapportsAvecStatutVote()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Fonction.php
+
+  Class: Fonction
+    [   9] -> public function __construct($db)
+    [  15] -> public function getIdFonction()
+    [  16] -> public function getLibFonction()
+    [  19] -> public function setIdFonction($id)
+    [  20] -> public function setLibFonction($lib)
+    [  22] -> public function ajouterFonction($lib_fonction)
+    [  28] -> public function updateFonction($id_fonction, $lib_fonction)
+    [  34] -> public function deleteFonction($id_fonction)
+    [  40] -> public function getFonctionById($id)
+    [  49] -> public function getAllFonctions()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Fonctionnalite.php
+
+  Class: Fonctionnalite
+    [   7] -> public function __construct($pdo)
+    [  15] -> public function getFonctionnalitesByCategorie($id_categorie)
+    [  30] -> public function getFonctionnaliteById($id_fonctionnalite)
+    [  42] -> public function getFonctionnaliteByCode($code_fonctionnalite)
+    [  55] -> public function getFonctionnaliteByUrl($url_fonctionnalite)
+    [  75] -> public function getFonctionnalitesForGroupeAndCategorie($id_GU, $id_categorie)
+    [  96] -> public function getFonctionnalitesForGroupe($id_GU)
+    [ 115] -> public function getSousPages($code_page_parente)
+    [ 130] -> public function createFonctionnalite($data)
+    [ 158] -> public function updateFonctionnalite($id_fonctionnalite, $data)
+    [ 188] -> public function updateFonctionnaliteAdmin($id_fonctionnalite, $data)
+    [ 230] -> public function deleteFonctionnalite($id_fonctionnalite)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Grade.php
+
+  Class: Grade
+    [   9] -> public function __construct($db)
+    [  15] -> public function getIdGrade()
+    [  20] -> public function getLibGrade()
+    [  26] -> public function setIdGrade($id)
+    [  31] -> public function setLibGrade($lib)
+    [  37] -> public function getAllGrades()
+    [  45] -> public function getGradeById($id)
+    [  55] -> public function ajouterGrade($lib_grade)
+    [  62] -> public function updateGrade($id_grade, $lib_grade)
+    [  74] -> public function deleteGrade($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\GroupeUtilisateur.php
+
+  Class: GroupeUtilisateur
+    [   8] -> public function __construct($pdo)
+    [  13] -> private function supportsTypeLink()
+    [  28] -> public function getAllGroupeUtilisateur()
+    [  39] -> public function getGroupesByTypeUtilisateur(int $idTypeUtilisateur)
+    [  67] -> public function ajouterGroupeUtilisateur($lib_GU, $id_type_utilisateur = null)
+    [  83] -> public function updateGroupeUtilisateur($id_GU, $lib_GU, $id_type_utilisateur = null)
+    [  99] -> public function deleteGroupeUtilisateur($id)
+    [ 105] -> public function getGroupeUtilisateurById($id_GU)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\InfoStage.php
+
+  Class: InfoStage
+    [   6] -> public function __construct($db)
+    [  11] -> public function getStageInfo($num_etu)
+    [  28] -> public function getEntreprises()
+    [  35] -> public function updateStageInfo($etudiant_id, $stage_data)
+    [  55] -> public function createStageInfo($etudiant_id, $stage_data)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Inscription.php
+
+  Class: Inscription
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllInscriptions()
+    [  39] -> public function getInscriptionById($id_inscription)
+    [  63] -> public function getInscriptionsByEtudiant($num_etu)
+    [  86] -> public function getInscriptionActuelle($num_etu)
+    [ 110] -> public function creerInscription($id_etudiant, $id_niveau, $id_annee_acad, $nombre_tranche = 0, $reste_a_payer = 0, $montant_paye = 0)
+    [ 132] -> public function modifierInscription($id_inscription, $id_niveau, $id_annee_acad, $nombre_tranche = null)
+    [ 158] -> public function supprimerInscription($id_inscription)
+    [ 173] -> public function etudiantInscrit($num_etu, $id_annee_acad)
+    [ 191] -> public function changerStatut($id_inscription, $statut)
+    [ 206] -> public function getStatistiquesParAnnee($id_annee_acad)
+    [ 228] -> public function countInscriptions($id_annee_acad = null)
+    [ 251] -> public function countNouvellesInscriptions($jours = 7, $id_annee_acad = null)
+    [ 274] -> public function getInscriptionsParNiveau($id_annee_acad = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Jury.php
+
+  Class: Jury
+    [   7] -> public function __construct($db)
+    [  15] -> private function getAnneeBounds($id_annee_acad)
+    [  53] -> public function getStatsByEnseignant($id_annee_acad, array $filters = [], $limit = 300, $offset = 0)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\MaitreDeStage.php
+
+  Class: MaitreDeStage
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllMaitresDeStage()
+    [  46] -> public function findByNameAndEmail($nom, $prenom, $email)
+    [  73] -> private function generateId($id_entreprise)
+    [  95] -> public function create($data)
+    [ 130] -> public function getById($id)
+    [ 157] -> public function findOrCreate($data)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Message.php
+
+  Class: Message
+    [   9] -> public function __construct($db)
+    [  14] -> public function ajouterMessage($contenu_message, $lib_message, $type_message)
+    [  21] -> public function updateMessage($id_message, $contenu_message, $lib_message, $type_message)
+    [  27] -> public function deleteMessage($id_message)
+    [  33] -> public function getMessageById($id_message)
+    [  40] -> public function getAllMessages()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\NiveauAccesDonnees.php
+
+  Class: NiveauAccesDonnees
+    [   7] -> public function __construct($pdo)
+    [  12] -> public function getAllNiveauxAccesDonnees()
+    [  18] -> public function ajouterNiveauAccesDonnees($lib)
+    [  24] -> public function updateNiveauAccesDonnees($id, $lib)
+    [  30] -> public function deleteNiveauAccesDonnees($id)
+    [  36] -> public function getNiveauAccesDonneesById($id)
+    [  43] -> public function getLastNiveauAccesDonnees()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\NiveauApprobation.php
+
+  Class: NiveauApprobation
+    [   6] -> public function __construct($db)
+    [  10] -> public function ajouterNiveauApprobation($lib_approb)
+    [  15] -> public function updateNiveauApprobation($id_approb, $lib_approb)
+    [  20] -> public function deleteNiveauApprobation($id_approb)
+    [  25] -> public function getNiveauApprobationById($id_approb)
+    [  31] -> public function getAllNiveauxApprobation()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\NiveauEtude.php
+
+  Class: NiveauEtude
+    [   7] -> public function __construct($pdo)
+    [  12] -> public function getAllNiveauxEtudes()
+    [  20] -> public function getAll()
+    [  25] -> public function ajouterNiveauEtude($lib, $montant_scolarite, $montant_inscription, $id_enseignant = null)
+    [  31] -> public function updateNiveauEtude($id, $lib, $montant_scolarite, $montant_inscription, $id_enseignant = null)
+    [  37] -> public function deleteNiveauEtude($id)
+    [  43] -> public function getNiveauEtudeById($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Note.php
+
+  Class: Note
+    [   7] -> public function __construct($db)
+    [  15] -> public function getByStudent($studentId, $anneeAcadId = null)
+    [  44] -> public function saveNotes($numEtu, $moyenneM1, $moyenneM2, $anneeAcadId)
+    [  66] -> public function getByStudentAndYear($studentId, $anneeAcadId)
+    [  87] -> private function createNote($numEtu, $moyenneM1, $moyenneM2, $anneeAcadId)
+    [ 104] -> private function updateNote($noteId, $moyenneM1, $moyenneM2)
+    [ 122] -> public function deleteNote($noteId)
+    [ 137] -> public function getMoyenneGenerale($studentId, $anneeAcadId = null)
+    [ 165] -> public function getLatestNote($studentId)
+    [ 187] -> public function getNotesByNiveauAndYear($niveauId, $anneeAcadId)
+    [ 230] -> public function getNotesByYear($anneeAcadId = null)
+    [ 259] -> public function getClassementStudent($studentId)
+    [ 309] -> public function getSemestreByEtudiant($studentId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Permission.php
+
+  Class: Permission
+    [   7] -> public function __construct($pdo)
+    [  15] -> public function checkPermission($id_GU, $id_fonctionnalite, $type_permission = 'peut_voir')
+    [  32] -> public function checkPermissionByCode($id_GU, $code_fonctionnalite, $type_permission = 'peut_voir')
+    [  51] -> public function getPermissions($id_GU, $id_fonctionnalite)
+    [  67] -> public function getAllPermissionsForGroupe($id_GU)
+    [  86] -> public function createPermission($data)
+    [ 111] -> public function updatePermission($id_GU, $id_fonctionnalite, $data)
+    [ 134] -> public function deletePermission($id_GU, $id_fonctionnalite)
+    [ 146] -> public function assignCategorieToGroupe($id_GU, $id_categorie, $permissions = [])
+    [ 177] -> public function revokeCategorieFromGroupe($id_GU, $id_categorie)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\PersAdmin.php
+
+  Class: PersAdmin
+    [  17] -> public function __construct($db)
+    [  23] -> public function getIdPersAdmin()
+    [  24] -> public function getNomPersAdmin()
+    [  25] -> public function getPrenomPersAdmin()
+    [  26] -> public function getEmailPersAdmin()
+    [  27] -> public function getTelephonePersAdmin()
+    [  28] -> public function getDateEmbauche()
+    [  29] -> public function getPoste()
+    [  33] -> public function setIdPersAdmin($id)
+    [  34] -> public function setNomPersAdmin($nom)
+    [  35] -> public function setPrenomPersAdmin($prenom)
+    [  36] -> public function setEmailPersAdmin($email)
+    [  37] -> public function setTelephonePersAdmin($telephone)
+    [  38] -> public function setDateEmbauche($date)
+    [  39] -> public function setPoste($poste)
+    [  42] -> public function getAllPersAdmin()
+    [  50] -> public function getPersAdminById($id)
+    [  60] -> public function getPersAdminByLogin($login)
+    [  70] -> public function getByUserId($id_utilisateur)
+    [  81] -> public function ajouterPersAdmin($nom, $prenom, $email, $telephone, $poste, $date_embauche)
+    [ 100] -> public function modifierPersAdmin($id, $nom, $prenom, $email, $telephone, $poste, $date_embauche)
+    [ 125] -> public function supprimerPersAdmin($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\QualiteJury.php
+
+  Class: QualiteJury
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllRoles()
+    [  31] -> public function getRoleById($id_role_jury)
+    [  47] -> public function getRoleByCode($code_qltjury)
+    [  63] -> public function creerRole($code_qltjury, $lib_role)
+    [  78] -> public function modifierRole($id_role_jury, $code_qltjury, $lib_role)
+    [  93] -> public function supprimerRole($id_role_jury)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Rapport.php
+
+  Class: Rapport
+    [   7] -> public function __construct($db)
+    [  21] -> public function getByAnneeWithFiles($id_annee_acad, array $filters = [], $limit = 500, $offset = 0)
+    [ 132] -> public function findDocumentByTypeAndId($type, $id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\RapportEtudiant.php
+
+  Class: RapportEtudiant
+    [   9] -> public function __construct($pdo)
+    [  14] -> private function tableExists($tableName)
+    [  31] -> private function columnExists($tableName, $columnName)
+    [  53] -> private function getReportDateColumn()
+    [  64] -> private function getReportTitleColumn()
+    [  69] -> private function getReportSelectExtras($alias = 'r')
+    [  80] -> private function getReportOrderBy($alias = 'r')
+    [  89] -> public function getAllRapports()
+    [ 109] -> public function getRapportById($id_rapport)
+    [ 132] -> public function getRapportDetail($id_rapport)
+    [ 148] -> public function getRapportByIdAndEtudiant($id_rapport, $num_etu)
+    [ 163] -> public function getRapportsByEtudiant($num_etu)
+    [ 185] -> public function ajouterRapport($num_etu, $nom_rapport, $theme_rapport)
+    [ 239] -> public function updateRapport($id_rapport, $num_etu, $nom_rapport, $theme_rapport)
+    [ 278] -> public function deleteRapport($id_rapport, $num_etu)
+    [ 295] -> public function isRapportExist($id_rapport)
+    [ 302] -> public function isRapportOwnedByEtudiant($id_rapport, $num_etu)
+    [ 309] -> public function isEtudiantExist($num_etu)
+    [ 316] -> public function isRapportNomExist($nom_rapport, $num_etu, $id_rapport = null)
+    [ 339] -> public function getStatsEtudiant($num_etu)
+    [ 375] -> public function searchRapports($search_term, $num_etu = null)
+    [ 407] -> public function getRecentRapports($limit = 10)
+    [ 434] -> public function countRapportsByEtudiant($num_etu)
+    [ 446] -> public function getEtudiantInfo($num_etu)
+    [ 464] -> public function updateStatutRapport($id_rapport, $statut)
+    [ 475] -> public function setRapportEnCours($id_rapport)
+    [ 486] -> public function updateCheminFichier($id_rapport, $chemin_fichier, $taille_fichier = null)
+    [ 497] -> public function getRapportsByStatut($statut)
+    [ 519] -> public function ajouterEvaluation($id_rapport, $id_evaluateur, $type_evaluateur, $commentaire, $note = null)
+    [ 533] -> public function getEvaluationsRapport($id_rapport)
+    [ 560] -> public function getRapportsDeposes()
+    [ 580] -> public function getDecisionsEvaluation($id_rapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Reclamation.php
+
+  Class: Reclamation
+    [  10] -> public function __construct()
+    [  15] -> private function tableExists($tableName)
+    [  28] -> private function hasColumn($tableName, $columnName)
+    [  42] -> private function normalizeStatutLabel($statut)
+    [  66] -> private function getOrCreateStatutId($libelle)
+    [ 100] -> public function creer($donnees)
+    [ 136] -> public function getTous($limit = 10, $offset = 0, $filtres = [])
+    [ 187] -> public function getParId($id)
+    [ 207] -> public function compterTotal($filtres = [])
+    [ 237] -> public function getStatistiques()
+    [ 260] -> public function getAllReclamationsWithEtudiant()
+    [ 300] -> public function updateStatut($id, $statut)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Salle.php
+
+  Class: Salle
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllSalles()
+    [  31] -> public function getSalleById($id_salle)
+    [  47] -> public function getSalleByName($lib_salle)
+    [  63] -> public function creerSalle($lib_salle)
+    [  78] -> public function modifierSalle($id_salle, $lib_salle)
+    [  93] -> public function supprimerSalle($id_salle)
+    [ 108] -> public function verifierDisponibilite($id_salle, $date_soutenance, $heure_soutenance, $num_soutenance_exclure = null)
+    [ 137] -> public function getSallesDisponibles($date_soutenance, $heure_soutenance)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Scolarite.php
+
+  Class: Scolarite
+    [   8] -> public function __construct($db)
+    [  13] -> private function tableExists($tableName)
+    [  24] -> private function columnExists($tableName, $columnName)
+    [  43] -> private function getAcademicYearLabelById($id_annee_acad)
+    [  60] -> private function synchronizeStudentAcademicContext($id_etudiant, $id_niveau, $id_annee_acad)
+    [  98] -> private function refreshStudentYearBalances($id_etudiant, $id_annee_acad, $id_niveau = null)
+    [ 162] -> public function getMontantScolarite($id_niveau)
+    [ 177] -> public function getNiveauxEtudes($idAnneeAcad = null)
+    [ 197] -> public function getInfoEtudiant($numEtu)
+    [ 208] -> public function getAllEtudiants()
+    [ 220] -> public function getEtudiantsInscrits($id_annee_acad = null)
+    [ 258] -> public function getAllVersements()
+    [ 291] -> public function getEtudiantsNonInscrits($id_annee_acad = null)
+    [ 316] -> public function creerInscription($id_etudiant, $id_niveau, $id_annee_acad, $montant_versement, $methode_paiement, $num_piece = null)
+    [ 396] -> public function modifierInscription($id_inscription, $id_niveau, $id_annee_acad, $montant_versement, $nombre_tranches = null, $methode_paiement = null)
+    [ 451] -> public function creerEcheance($id_inscription, $montant, $date_echeance)
+    [ 463] -> public function supprimerEcheances($id_inscription)
+    [ 477] -> public function estEtudiantInscritPourAnnee($id_etudiant, $id_annee_acad)
+    [ 490] -> public function getInfosPaiementEtudiant($id_etudiant, $id_annee_acad)
+    [ 514] -> public function getVersementById($id_inscription)
+    [ 531] -> public function supprimerVersement($id_inscription)
+    [ 536] -> public function supprimerInscription($id_inscription)
+    [ 575] -> public function updateVersement($id_inscription, $data)
+    [ 614] -> public function getVersementsEtudiant($id_etudiant, $id_annee_acad)
+    [ 627] -> public function getDerniereInscription($id_etudiant)
+    [ 636] -> public function getInscriptionByEtudiantId($id_etudiant)
+    [ 668] -> public function addVersement($data)
+    [ 692] -> public function getInscriptionById($id_inscription)
+    [ 740] -> public function getLastVersementByInscription($id_inscription)
+    [ 789] -> public function getMontantsAsOf($id_inscription, $asOfDate)
+    [ 852] -> public function updateFicheInscription($idInscription, $fichePath)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Semestre.php
+
+  Class: Semestre
+    [   6] -> public function __construct($db)
+    [  10] -> public function ajouterSemestre($lib_semestre, $id_niv_etude)
+    [  15] -> public function updateSemestre($id_semestre, $lib_semestre,$id_niv_etude)
+    [  20] -> public function deleteSemestre($id_semestre)
+    [  25] -> public function getSemestreById($id_semestre)
+    [  31] -> public function getAllSemestres()
+    [  38] -> public function getSemestresByNiveau(int $niveauId, ?int $studentId = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Soutenance.php
+
+  Class: Soutenance
+    [   7] -> public function __construct($db)
+    [  15] -> private function getAnneeBounds($id_annee_acad)
+    [  55] -> public function getByAnnee($id_annee_acad, array $filters = [], $limit = 200, $offset = 0)
+    [ 174] -> public function countByAnnee($id_annee_acad, array $filters = [])
+    [ 231] -> public function getById($num_soutenance)
+    [ 260] -> public function getJuryBySoutenance($num_soutenance)
+    [ 294] -> public function getEvaluationBySoutenance($num_etud, $num_soutenance, $id_annee_acad = null)
+    [ 336] -> public function getCalendarByAnnee($id_annee_acad)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Specialite.php
+
+  Class: Specialite
+    [   9] -> public function __construct($db)
+    [  15] -> public function getIdSpecialite()
+    [  20] -> public function getLibSpecialite()
+    [  26] -> public function setIdSpecialite($id)
+    [  31] -> public function setLibSpecialite($lib)
+    [  37] -> public function getAllSpecialites()
+    [  45] -> public function getSpecialiteById($id)
+    [  54] -> public function ajouterSpecialite($lib)
+    [  60] -> public function updateSpecialite($id, $lib)
+    [  66] -> public function deleteSpecialite($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\StatutJury.php
+
+  Class: StatutJury
+    [   6] -> public function __construct($pdo)
+    [  11] -> public function getAllStatutsJury()
+    [  17] -> public function ajouterStatutJury($lib)
+    [  23] -> public function updateStatutJury($id, $lib)
+    [  29] -> public function deleteStatutJury($id)
+    [  35] -> public function getStatutJuryById($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Traitement.php
+
+  Class: Traitement
+    [   9] -> public function __construct($db)
+    [  15] -> private function resolveExistingTable(array $candidates)
+    [  32] -> public function getAllTraitements()
+    [  44] -> public function getTraitementByGU($id_GU)
+    [  57] -> public function getTraitementById($id_traitement)
+    [  63] -> public function getTraitementByLib($lib_traitement)
+    [  69] -> public function addTraitement($lib_traitement, $label_traitement, $icone_traitement, $ordre_traitement)
+    [  76] -> public function updateTraitement($id_traitement, $lib_traitement, $label_traitement, $icone_traitement, $ordre_traitement)
+    [  81] -> public function deleteTraitement($id_traitement)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\TypeUtilisateur.php
+
+  Class: TypeUtilisateur
+    [   7] -> public function __construct($pdo)
+    [  13] -> public function getAllTypeUtilisateur()
+    [  20] -> public function ajouterTypeUtilisateur($lib_type_utilisateur)
+    [  27] -> public function updateTypeUtilisateur($id_type_utilisateur, $lib_type_utilisateur)
+    [  39] -> public function deleteTypeUtilisateur($id)
+    [  45] -> public function getTypeUtilisateurById($id_type_utilisateur)
+    [  52] -> public function getTypeUtilisateurByLibelle($lib_type_utilisateur)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Utilisateur.php
+
+  Class: Utilisateur
+    [   8] -> public function __construct($db)
+    [  13] -> public function verifierConnexion($login, $password)
+    [  36] -> public function getLibelleGroupeUtilisateur($idUtilisateur)
+    [  60] -> public function getLibelleTypeUtilisateur($idUtilisateur)
+    [  81] -> public function getLibelleNivAcces($idUtilisateur)
+    [ 100] -> public function getAllUserLabels($idUtilisateur)
+    [ 120] -> public function getAllUtilisateurs()
+    [ 135] -> public function getUtilisateurById($id)
+    [ 147] -> public function getUtilisateurByLogin($login)
+    [ 161] -> public function ajouterUtilisateur($nom, $id_type_utilisateur, $id_GU, $id_niv_acces_donnees, $statut_utilisateur, $login, $mdp)
+    [ 177] -> public function updateUtilisateur($nom, $id_type_utilisateur, $id_GU, $id_niv_acces_donnees, $statut_utilisateur, $login, $id)
+    [ 197] -> public function desactiverUtilisateur($id)
+    [ 211] -> public function reactiverUtilisateur($id)
+    [ 219] -> public function updatePassword($id, $newPassword)
+    [ 228] -> public function getAllUtilisateursActifs()
+    [ 245] -> public function getAllUtilisateursInactifs()
+    [ 262] -> public function getAllUtilisateursByType($type)
+    [ 281] -> public function getAllUtilisateursByGroupe($groupe)
+    [ 300] -> public function getEnseignantActif()
+    [ 318] -> public function getEnseignantInactif()
+    [ 335] -> public function getEtudiantActif()
+    [ 353] -> public function getEtudiantInactif()
+    [ 370] -> public function getPersAdminActif()
+    [ 387] -> public function getPersAdminInactif()
+    [ 404] -> public function getAllUtilisateursByStatut($statut)
+    [ 423] -> public function getUtilisateurActif()
+    [ 440] -> public function getUtilisateurInactif()
+    [ 459] -> public function getEnseignantsNonUtilisateurs()
+    [ 472] -> public function getPersonnelNonUtilisateurs()
+    [ 485] -> public function getEtudiantsNonUtilisateurs()
+    [ 500] -> public function getEtudiantsInscritsNonUtilisateurs()
+    [ 514] -> public function isLoginUsed($login)
+    [ 524] -> function generateRandomPassword($length = 12)
+    [ 534] -> public function ajouterUtilisateursEnMasse($utilisateurs)
+    [ 571] -> public function getEnseignantById($id)
+    [ 580] -> public function getPersonnelById($id)
+    [ 589] -> public function getEtudiantById($id)
+    [ 603] -> public function getEmailByNomAndType($nomUtilisateur, $idTypeUtilisateur)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Valider.php
+
+  Class: Valider
+    [  11] -> public static function insererDecision($id_enseignant, $id_rapport, $decision_validation, $commentaire_validation = '')
+    [  44] -> public static function getByRapport($id_rapport)
+    [  70] -> public static function getDerniereDecision($id_rapport)
+    [  97] -> public static function estValide($id_rapport)
+    [ 106] -> public static function estRejete($id_rapport)
+    [ 116] -> public static function getRapportsValides()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\models\Versement.php
+
+  Class: Versement
+    [   7] -> public function __construct($db)
+    [  15] -> public function getAllVersements()
+    [  39] -> public function getVersementById($id_versement)
+    [  63] -> public function getVersementsByInscription($id_inscription)
+    [  81] -> public function getVersementsByEtudiant($num_etu)
+    [ 103] -> public function creerVersement($id_inscription, $montant, $type_versement, $methode_paiement)
+    [ 135] -> public function modifierVersement($id_versement, $montant, $methode_paiement)
+    [ 157] -> public function supprimerVersement($id_versement)
+    [ 172] -> public function getTotalVersements($id_inscription)
+    [ 191] -> public function getPremierVersement($id_inscription)
+    [ 210] -> public function getStatistiquesVersements($id_annee_acad = null)
+    [ 239] -> public static function getMethodesPaiement()
+    [ 247] -> public static function getTypesVersement()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Security\AuthorizationService.php
+Namespace: CheckMaster\Security
+
+  Class: AuthorizationService
+    [  15] -> public function __construct(PDO $pdo)
+    [  25] -> public function canAccessLegacyPage(int $idGroupe, string $pageSlug, string $action)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Security\DbRateLimiter.php
+Namespace: CheckMaster\Security
+
+  Class: DbRateLimiter
+    [  17] -> public function __construct(PDO $pdo)
+    [  25] -> public function isAllowed(string $action, string $ip, string $identifier)
+    [  52] -> public function hit(string $action, string $ip, string $identifier, int $maxAttempts, int $windowSeconds, int $blockSeconds)
+    [ 115] -> public function reset(string $action, string $ip, string $identifier)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Security\LegacyActionResolver.php
+Namespace: CheckMaster\Security
+
+  Class: LegacyActionResolver
+    [  14] -> public static function resolve(string $page, array $get, array $post, string $method)
+    [  81] -> private static function map()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Security\RouteActionResolver.php
+Namespace: CheckMaster\Security
+
+  Class: RouteActionResolver
+    [  13] -> public static function buildLegacyRoutePattern(string $page, array $get)
+    [  36] -> public static function resolve(PDO $pdo, string $page, array $get, array $post, string $method)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Security\RoutePermissionService.php
+Namespace: CheckMaster\Security
+
+  Class: RoutePermissionService
+    [  17] -> public function __construct(PDO $pdo)
+    [  25] -> public function resolveLegacy(array $get, array $post, string $method)
+    [  67] -> public function canAccessLegacy(int $idGroupe, array $get, array $post, string $method)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ArchivesCompteRenduService.php
+Namespace: CheckMaster\Services
+
+  Class: ArchivesCompteRenduService
+    [  14] -> public function __construct($db)
+    [  24] -> public function getPaginatedArchives(?string $search, ?string $year, int $page = 1, int $limit = 10)
+    [  42] -> public function getArchiveById($id)
+    [  48] -> public function deleteArchive($id)
+    [  53] -> public function getStats()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ArchivesDossiersSoutenanceService.php
+Namespace: CheckMaster\Services
+
+  Class: ArchivesDossiersSoutenanceService
+    [  25] -> public function __construct($db)
+    [  36] -> public function getRapportsArchives($filtres = [])
+    [ 115] -> public function getStatistiquesArchives()
+    [ 170] -> public function getRapportDetails($idRapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ArchiveService.php
+Namespace: CheckMaster\Services
+
+  Class: ArchiveService
+    [  23] -> public function __construct($db)
+    [  52] -> public function getIndexData(
+        string $tab = 'vue_ensemble',
+        ?string $anneeAcad = null,
+        ?string $statut = null,
+        ?string $search = null,
+        int $page = 1,
+        int $perPage = 20
+    )
+    [ 106] -> public function getStudentFile(string $numEtu)
+    [ 121] -> public function updateStudentInfo(string $numEtu, array $postData)
+    [ 163] -> public function importArchiveFile(array $file)
+    [ 214] -> public function logModification(int $userId, string $target, string $status)
+    [ 222] -> public function logAction(int $userId, string $action, string $target, string $status)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\AuditService.php
+Namespace: CheckMaster\Services
+
+  Class: AuditService
+    [  18] -> public function __construct($db)
+    [  28] -> public function getAllActions()
+    [  36] -> public function extractFilters(array $params)
+    [  52] -> public function getFilteredAuditLog(array $filters, $offset, $limit)
+    [  72] -> public function getTotalFilteredLogs(array $filters)
+    [  93] -> public function exportToStream($output, array $filters)
+    [ 130] -> public function cleanupLogs($days, $idUtilisateur)
+    [ 151] -> public function deleteSingleLog($logId, $idUtilisateur)
+    [ 172] -> public function getTablesList()
+    [ 183] -> public function getStatutsList()
+    [ 194] -> private function applyFilters(&$sql, &$params, array $filters)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\AuthService.php
+Namespace: CheckMaster\Services
+
+  Class: AuthService
+    [  31] -> public function __construct($db)
+    [  40] -> public function login($login, $password, $ip)
+    [ 108] -> public function logout($idUtilisateur)
+    [ 130] -> public function updatePassword($idUtilisateur, $currentPassword, $newPassword, $confirmPassword)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\CandidatureSoutenanceService.php
+Namespace: CheckMaster\Services
+
+  Class: CandidatureSoutenanceService
+    [  29] -> public function __construct($db)
+    [  39] -> public function getStageInfo($num_etu)
+    [  44] -> public function getCompteRendu($num_etu)
+    [  49] -> public function getCandidature($num_etu)
+    [  54] -> public function getCandidatures($num_etu)
+    [  59] -> public function getAllEntreprises()
+    [  64] -> public function getAllMaitresDeStage()
+    [  69] -> private function getStudentAcademicYearId(string $etudiantId)
+    [  79] -> public function soumettreCandidature($etudiant_id, $id_utilisateur)
+    [ 122] -> public function enregistrerInfoStage($etudiant_id, $id_utilisateur, $data)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\CriteresEvaluationService.php
+Namespace: CheckMaster\Services
+
+  Class: CriteresEvaluationService
+    [  16] -> public function __construct($db)
+    [  26] -> public function getAnneesAcademiques()
+    [  37] -> public function getCriteres()
+    [  86] -> public function createCritere(array $input)
+    [ 139] -> public function updateCritere(array $input)
+    [ 198] -> public function deleteCritere(array $input)
+    [ 235] -> private function validateBaremesTotaux(array $nouveauxBaremes, ?int $critereIdExclure = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DashboardCommissionService.php
+Namespace: CheckMaster\Services
+
+  Class: DashboardCommissionService
+    [  42] -> public function __construct($db)
+    [  49] -> private function tableExists($tableName)
+    [  66] -> private function columnExists($tableName, $columnName)
+    [  88] -> private function rapportDateExpr($alias = 'r')
+    [  99] -> private function rapportTitleExpr($alias = 'r')
+    [ 112] -> public function getAnneeAcademiqueActive()
+    [ 149] -> public function getNombreRapportsRejetes()
+    [ 170] -> public function getDashboardData()
+    [ 212] -> public function getTotalRapports()
+    [ 231] -> public function getTauxValidation()
+    [ 257] -> public function getTempsMoyenTraitement()
+    [ 284] -> public function getRapportsEnAttente()
+    [ 313] -> public function getEvolutionMensuelle()
+    [ 339] -> public function getRepartitionStatuts()
+    [ 387] -> public function getPerformanceCategories()
+    [ 413] -> public function getActivitesRecentes()
+    [ 448] -> public function getRapportsDetails()
+    [ 484] -> public function getEvaluationsRapports()
+    [ 510] -> public function getDefaultDashboardData()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DashboardEnseignantService.php
+Namespace: CheckMaster\Services
+
+  Class: DashboardEnseignantService
+    [  41] -> public function __construct($db)
+    [  55] -> public function getGlobalStats($loginUtilisateur)
+    [  88] -> private function getNiveauxByEnseignant($enseignantId)
+    [  98] -> private function buildMesNiveauxStats(array $niveaux, array $etudiantsSuivantCours)
+    [ 119] -> private function getEtudiantsByNiveaux(array $niveauIds)
+    [ 145] -> public function populateDashboardGlobals($loginUtilisateur)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DashboardScolariteService.php
+Namespace: CheckMaster\Services
+
+  Class: DashboardScolariteService
+    [  45] -> public function __construct($db)
+    [  53] -> private function getSelectedYearId()
+    [  63] -> public function getDashboardData()
+    [ 120] -> private function loadReclamationStats(array $stats)
+    [ 144] -> private function loadPaiementStats(array $stats, ?int $selectedYearId = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DashboardSecretaireService.php
+Namespace: CheckMaster\Services
+
+  Class: DashboardSecretaireService
+    [  37] -> public function __construct($db)
+    [  49] -> public function getDashboardData()
+    [  63] -> public function getStats()
+    [ 120] -> public function getActivitesRecentes()
+    [ 149] -> public function getEvolutionEffectifs()
+    [ 189] -> private function getRecentInscriptions()
+    [ 221] -> private function getRecentReclamations()
+    [ 253] -> private function getRecentCandidatures()
+    [ 286] -> private function getRecentRapports()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DashboardService.php
+Namespace: CheckMaster\Services
+
+  Class: DashboardService
+    [  55] -> public function __construct($db)
+    [  70] -> public function logAccess($userId)
+    [  80] -> public function getGlobalStats()
+    [ 113] -> public function getDetailedStats(array $globalStats)
+    [ 161] -> public function getRecentActivities()
+    [ 182] -> public function getChartData()
+    [ 198] -> private function getLastSixMonths()
+    [ 212] -> public function getDashboardData()
+    [ 269] -> public function populateDashboardGlobals()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\PdfGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: SilentTcpdf
+    [  14] -> public function __construct($orientation = 'P', $unit = 'mm', $format = 'A4', $unicode = true, $encoding = 'UTF-8', $diskcache = false, $pdfa = false)
+    [  20] -> public function Header()
+    [  24] -> public function Footer()
+
+  Class: PdfGeneratorService
+    [  49] -> public function __construct(
+        private readonly string $storagePath,
+        private readonly string $logoPath,
+        private readonly ?object $configService = null
+    )
+    [  65] -> public function createDocument(
+        string $orientation = 'P',
+        string $format = 'A4',
+        string $title = '',
+        ?string $author = null
+    )
+    [ 110] -> public function addHeader(TCPDF $pdf, string $title, ?string $subtitle = null)
+    [ 163] -> public function addFooter(TCPDF $pdf)
+    [ 177] -> public function save(TCPDF $pdf, string $subdir, string $filename)
+    [ 210] -> public function getStoragePath(string $type)
+    [ 222] -> public function writeHtml(TCPDF $pdf, string $html)
+    [ 233] -> private function normalizeHtmlForPdf(string $html)
+    [ 249] -> private function runTcpdfWithoutDeprecationWarnings(callable $callback)
+    [ 267] -> public function addPage(TCPDF $pdf, bool $withHeader = true)
+    [ 282] -> public function resolveLogoPaths()
+    [ 309] -> public function getLogoMairiePath()
+    [ 315] -> private function drawLogoPlaceholder(TCPDF $pdf, float $x, float $y, float $w, float $h, string $label)
+    [ 325] -> private function resolveConfiguredPath(string $configuredPath, string $fallback)
+    [ 338] -> private function resolveDefaultLogoPath(string $kind)
+    [ 368] -> private function toExistingPath(string $path)
+    [ 396] -> private function guessProjectRoot()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\PlanningGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: PlanningGeneratorService
+    [  26] -> public function __construct(
+        private readonly PdfGeneratorService $pdfGenerator,
+        private readonly PlanningDataUtils $planningDataUtils,
+        private readonly Database $db,
+        private readonly ?object $notificationService = null
+    )
+    [  43] -> public function generate(?int $sessionId, ?string $dateFrom, ?string $dateTo, int $userId)
+    [ 144] -> private function enrichWithFullJurys(array $soutenances)
+    [ 153] -> private function groupByDate(array $soutenances)
+    [ 167] -> private function addInstitutionalHeader(\TCPDF $pdf, ?int $sessionId, string $date)
+    [ 203] -> private function formatDateLongue(DateTimeImmutable $date)
+    [ 216] -> private function buildDatePlanningContent(array $soutenances)
+    [ 293] -> private function notifyStudentsOfPlanning(array $soutenances, int $userId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\PvCommissionGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: PvCommissionGeneratorService
+    [  30] -> public function __construct(
+        private readonly PdfGeneratorService $pdfGenerator,
+        private readonly PlanningDataUtils $dataUtils,
+        private readonly Database $db,
+        private readonly ?object $notificationService = null
+    )
+    [  45] -> public function generate(int $compteRenduId, int $userId)
+    [ 151] -> private function notifyStudentsOfCommissionResult(array $rapportsEvalues, int $userId)
+    [ 181] -> private function buildPvContent(
+        string $reference,
+        array $compteRendu,
+        array $session,
+        array $membres,
+        array $rapportsEvalues
+    )
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\PvFinalGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: PvFinalGeneratorService
+    [  51] -> public function __construct(
+        private readonly PdfGeneratorService $pdfGenerator,
+        private readonly PlanningDataUtils $dataUtils
+    )
+    [  60] -> public function generate(string $soutenanceId, int $userId)
+    [ 260] -> public function addPageAnnexe1(TCPDF $pdf, array $data)
+    [ 312] -> public function addPageAnnexe2(TCPDF $pdf, array $data)
+    [ 367] -> public function addPageAnnexe3(TCPDF $pdf, array $data)
+    [ 422] -> public function addEnteteInstitutionnel(TCPDF $pdf, int $annexeNum, array $colors, string $numeroPv = '')
+    [ 446] -> public function calculerMoyenneCoeff(float $note, int $coeff)
+    [ 451] -> public function formaterDecision(string $decision)
+    [ 466] -> private function buildAnnexe1Rows(string $numEtudiant)
+    [ 519] -> private function findMatchingNoteIndex(array $notes, array $keywords, array $usedIndexes)
+    [ 544] -> private function extractJuryMembers(mixed $juryRaw)
+    [ 622] -> private function renderJurySignatures(TCPDF $pdf, array $juryMembers)
+    [ 635] -> private function renderJuryLine(TCPDF $pdf, string $label, string $name)
+    [ 646] -> private function normalizeJuryMembers(mixed $juryRaw)
+    [ 669] -> private function applyFooters(TCPDF $pdf, int $totalPages)
+    [ 681] -> private function toNullableFloat(mixed $value)
+    [ 701] -> private function resolveScore(?float $primary, ?float $fallback)
+    [ 722] -> private function generateReference()
+    [ 732] -> private function formaterDate(string $date)
+    [ 745] -> private function formatNumber(float $value)
+    [ 750] -> private function truncateText(string $value, int $maxLength)
+    [ 764] -> private function sanitizeFilename(string $value)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\RapportPdfGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: RapportPdfGeneratorService
+    [  26] -> public function __construct(
+        private readonly PdfGeneratorService $pdfGenerator,
+        private readonly PlanningDataUtils $dataUtils
+    )
+    [  39] -> public function generate(int $rapportId, int $userId)
+    [ 123] -> private function addContentPages(TCPDF $pdf, array $rapport, ?array $etudiant, ?array $infoStage)
+    [ 144] -> private function extractBodyFromUnifiedHtml(string $html)
+    [ 177] -> private function extractBodyFromUnifiedHtmlDom(string $html)
+
+  Class: trim
+    [ 219] -> private function innerHtml(?\DOMNode $node)
+    [ 241] -> private function generateCoverPageHTML(array $rapport, ?array $etudiant, ?array $infoStage)
+    [ 321] -> private function resolveStoredReportHtml(array $rapport)
+    [ 346] -> private function resolveStoredHtmlPath(string $storedPath)
+    [ 366] -> private function isUnifiedReportDocument(string $html)
+    [ 372] -> private function buildLegacyDocumentHtml(array $rapport, ?array $etudiant, ?array $infoStage, string $bodyHtml)
+    [ 388] -> private function normalizeStoredHtml(string $html)
+    [ 404] -> private function escapeHtml(string $value)
+    [ 409] -> private function imageDataUri(string $path)
+    [ 433] -> private function addFooterToAllPages(TCPDF $pdf)
+    [ 451] -> private function buildFilename(array $rapport, array $etudiant)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\RecuGeneratorService.php
+Namespace: App\Services\Document
+
+  Class: RecuGeneratorService
+    [  25] -> public function __construct(
+        private readonly PdfGeneratorService $pdfGenerator,
+        private readonly RecuDataUtils $recuDataUtils,
+        private readonly Database $db
+    )
+    [  39] -> public function generate(int $versementId, int $userId)
+    [ 144] -> private function buildRecuContent(
+        string $reference,
+        array $versement,
+        array $inscription,
+        array $etudiant
+    )
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\Document\StudentInfoTrait.php
+Namespace: App\Services\Document
+
+  Class: StudentInfoTrait
+    [  23] -> private function addStudentInfo(TCPDF $pdf, array $etudiant, array $soutenance)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\DossierAcademiqueService.php
+Namespace: CheckMaster\Services
+
+  Class: DossierAcademiqueService
+    [  18] -> public function __construct($db)
+    [  32] -> public function saveOrUpdate(array $data, int $idUtilisateur)
+    [  67] -> public function getByNumEtu(string $numEtu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\EtudiantService.php
+Namespace: CheckMaster\Services
+
+  Class: EtudiantService
+    [  19] -> public function __construct($db)
+    [  26] -> public function getNiveauxEtude()
+    [  39] -> public function getAnneesAcademiques()
+    [  52] -> public function getEtudiantById($num_etu)
+    [  57] -> public function getAllEtudiants()
+    [  62] -> public function ajouterEtudiant($data, $idUtilisateur)
+    [ 103] -> public function modifierEtudiant($data, $idUtilisateur)
+    [ 147] -> public function supprimerEtudiants($ids, $idUtilisateur)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\EvaluationDossiersService.php
+Namespace: CheckMaster\Services
+
+  Class: EvaluationDossiersService
+    [  51] -> public function __construct($db)
+    [  59] -> private function tableExists($tableName)
+    [  76] -> private function columnExists($tableName, $columnName)
+    [  98] -> private function updateRapportDecision($idRapport, $statut, $etapeIfExists)
+    [ 114] -> private function getSelectedYearId()
+    [ 119] -> private function getRapportYearId($idRapport)
+    [ 131] -> private function ensureWritableRapport($idRapport, string $context)
+    [ 150] -> public function getIndexData()
+    [ 163] -> public function getStatistiques()
+    [ 286] -> public function getDossiersAEvaluer()
+    [ 298] -> public function getEnseignantIdFromAdmin($id_utilisateur)
+    [ 349] -> public function validerDossier($id_rapport, $id_utilisateur)
+    [ 380] -> public function rejeterDossier($id_rapport, $commentaire, $id_utilisateur)
+    [ 412] -> public function traiterDecisionCommission($id_rapport, $decision, $commentaire, $id_utilisateur)
+    [ 469] -> public function finaliserDecisionCommission($id_rapport, $id_utilisateur)
+    [ 520] -> public function getDetail($id_rapport)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\EvaluationSoutenanceService.php
+Namespace: CheckMaster\Services
+
+  Class: EvaluationSoutenanceService
+    [  21] -> public function __construct($pdo = null)
+    [  30] -> private function resolveAcademicYear(?string $preferredId = null)
+    [  50] -> private function getStudentAcademicYearId(string $numEtu)
+    [  86] -> private function resolveEvaluationJuryRefForEtudiant(string $numEtu)
+    [ 113] -> private function tableExists($tableName)
+    [ 130] -> private function columnExists($tableName, $columnName)
+    [ 152] -> private function getProgrammationTable()
+    [ 163] -> private function getProgrammationIdColumn($table = null)
+    [ 169] -> private function getProgrammationJuryColumn($table = null)
+    [ 175] -> private function getJuryTable()
+    [ 186] -> private function getJuryRefColumn($juryTable = null)
+    [ 192] -> private function getRolesTable()
+    [ 203] -> private function normalizeRoleName($value)
+    [ 211] -> private function getRoleIds()
+    [ 250] -> private function juryNameExpr($roleKey, $progAlias = 'p')
+    [ 272] -> private function resolveJuryRefForEtudiant($numEtu)
+    [ 321] -> private function getCriteriaRowsByYear($idAnneeAcad)
+    [ 389] -> private function getBaremeForCritere($idCritere, $idAnneeAcad)
+    [ 458] -> public function getSoutenancesProgrammeesForView()
+    [ 544] -> public function getAnneeAcademiqueCourante()
+    [ 563] -> public function getCriteresEvaluation()
+    [ 596] -> public function getAnneesAcademiques()
+    [ 613] -> public function getEvaluationExistante($numEtu)
+    [ 649] -> public function enregistrerEvaluation(string $numEtu, array $criteres, string $commentaireGeneral = '', ?string $idAnneeAcad = null)
+    [ 725] -> public function calculerSommeNotes(array $criteres, string $idAnneeAcad)
+    [ 749] -> public function supprimerEvaluation(string $numEtu)
+    [ 787] -> public function getCriteresParAnnee(string $idAnneeAcad)
+    [ 806] -> public function getDonneesPV(string $numEtu, ?float $moyenneMaster1Input = null)
+    [1024] -> public function calculerMention(float $noteTotale)
+    [1044] -> public function getBaremeCriteres()
+    [1058] -> public function calculerMoyennesPourAnnexe2(string $numEtu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionCandidaturesService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionCandidaturesService
+    [  40] -> public function __construct($db)
+    [  57] -> public function getAllCandidatures()
+    [  62] -> public function ensureWritableCandidature(string $numEtu)
+    [  92] -> public function getEtudiantByNumEtu(string $numEtu)
+    [ 100] -> public function getLastCandidatureByNumEtu(string $numEtu)
+    [ 111] -> public function getResumeCandidature(string $numEtu)
+    [ 128] -> public function getEtapeData(string $numEtu, int $etape, array $etapesValidation = [])
+    [ 152] -> public function logValidation(int $idUtilisateur)
+    [ 157] -> public function logRejet(int $idUtilisateur)
+    [ 162] -> public function logAction(int $idUtilisateur, string $action)
+    [ 178] -> public function envoyerResultatsFinaux(string $numEtu, string $loginUtilisateur, array $etapesValidation)
+    [ 203] -> private function buildScolariteData(string $numEtu)
+    [ 217] -> private function buildStageData(string $numEtu)
+    [ 231] -> private function buildSemestreData(string $numEtu)
+    [ 254] -> private function genererResumeFinal(string $numEtu, array $etapesValidation)
+    [ 301] -> private function determinerDecision(array $resume)
+    [ 316] -> private function envoyerEmailResultat(string $numEtu, array $resume, string $decision)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionDossiersCandidaturesService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionDossiersCandidaturesService
+    [  42] -> public function __construct($db)
+    [  57] -> public function tableExists($tableName)
+    [  76] -> public function columnExists($tableName, $columnName)
+    [ 101] -> private function yearCondition(string $alias = 'e')
+    [ 118] -> public function getRapportsVerifies()
+    [ 209] -> public function getStatistiques()
+    [ 305] -> public function getDetailsRapport($id_rapport)
+    [ 373] -> public function preparerDonneesPdf($id_rapport)
+    [ 434] -> public function preparerDonneesConsultation($id_rapport)
+    [ 464] -> public function logImpression($userId)
+    [ 473] -> public function logConsultation($userId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionEtudiantService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionEtudiantService
+    [  35] -> public function __construct($db)
+    [  42] -> private function niveauExists(int $idNiveau)
+    [  49] -> private function anneeExists(int $idAnnee)
+    [  59] -> private function resolveNiveauId($raw)
+    [  87] -> private function resolveAnneeId($raw)
+    [ 125] -> public function genererNumeroEtudiant(string $promotion_etu)
+    [ 145] -> public function getNiveauxEtude()
+    [ 163] -> public function getAnneesAcademiques()
+    [ 182] -> public function getEtudiantById(string $numEtu)
+    [ 192] -> public function getAllEtudiants()
+    [ 197] -> private function getSelectedAcademicYearId()
+    [ 202] -> private function getStudentAcademicYearId(string $numEtu)
+    [ 219] -> public function ajouterEtudiant(array $data, int $idUtilisateur)
+    [ 301] -> public function modifierEtudiant(array $data, int $idUtilisateur)
+    [ 420] -> public function supprimerEtudiants(array $selectedIds, int $idUtilisateur)
+    [ 474] -> public function filtrerEtudiants(array $listeEtudiants, string $searchTerm)
+    [ 497] -> public function paginer(array $listeEtudiants, int $currentPage, int $itemsPerPage)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionRapportService.php
+
+  Class: GestionRapportService
+    [  48] -> public function __construct($db)
+    [  59] -> private function filterReportsBySelectedYear(array $rapports)
+    [  64] -> private function getStudentAcademicYearId($num_etu)
+    [  77] -> private function ensureWritableForStudent(string $num_etu, string $context)
+    [  82] -> private function ensureWritableForRapport($rapportId, string $context)
+    [  89] -> private function getDerniereDecisionRapport(int $rapportId)
+    [ 104] -> private function isRapportRejete(?array $decision)
+    [ 119] -> public function getStatsEtudiant($num_etu)
+    [ 127] -> public function getRapportsRecentsEtudiant($num_etu, $limit = 5)
+    [ 136] -> public function getRecentRapports($limit = 5)
+    [ 144] -> public function calculerStatistiquesGlobales()
+    [ 179] -> public function calculerStatistiques($isEtudiant, $num_etu = null)
+    [ 198] -> public function getInfosDepotRapports($num_etu)
+    [ 256] -> public function getStageInfo($num_etu)
+    [ 287] -> public function getRapportById($id)
+    [ 295] -> public function isRapportDepose($num_etu, $id_rapport)
+    [ 305] -> public function chargerContenuRapport($rapport_id)
+    [ 343] -> private function compterMotsRapport($rapport_id, $num_etu)
+    [ 367] -> private function normaliserStatutCandidature($statut)
+    [ 395] -> private function assurerCandidatureAutomatique($num_etu)
+    [ 432] -> public function validerDonneesRapport($donnees)
+    [ 454] -> public function isRapportNomExist($nom_rapport, $num_etu, $edit_id = null)
+    [ 466] -> public function sauvegarderRapport($donneesRapport, $num_etu)
+    [ 555] -> public function sauvegarderContenuRapport($rapport_id, $contenu)
+    [ 588] -> public function enregistrerDepotRapport($id_rapport, $num_etu)
+    [ 655] -> public function aUnRapportEnCours($num_etu)
+    [ 685] -> public function getRapportsAvecDecisions($num_etu)
+    [ 708] -> public function getRapportsFiltres($isEtudiant, $num_etu, $statut = '', $search = '')
+    [ 739] -> public function getCommentairesEvaluateurs($rapportId)
+    [ 784] -> public function genererPdf($contenu_rapport, $nom_rapport, $edit_id, $num_etu)
+    [ 844] -> private function getCssPdf()
+    [ 928] -> public function supprimerRapport($rapportId, $num_etu)
+    [ 965] -> public function deleteRapport($rapport_id, $num_etu)
+    [ 990] -> public function getRapportAvecContenu($rapport_id, $num_etu)
+    [1008] -> public function getAllRapports()
+    [1018] -> public function getCandidatures($num_etu)
+    [1028] -> public function getAuditLog()
+    [1042] -> public function traiterDepotRapport($id_rapport, $num_etu)
+    [1066] -> public function renderCommentairesHtml($rapportId)
+    [1121] -> public function buildCsvData()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionReclamationsScolariteService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionReclamationsScolariteService
+    [  31] -> public function __construct(Reclamation $reclamationModel, AuditLog $auditLog)
+    [  44] -> public function getReclamationsPartitionnees()
+    [  74] -> public function changerStatut(int $reclamationId, string $nouveauStatut, int $idUtilisateur)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionReclamationsService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionReclamationsService
+    [  74] -> public function __construct(Reclamation $reclamationModel, AuditLog $auditLog)
+    [  87] -> public function getDashboardData()
+    [ 102] -> public function getTypesReclamation()
+    [ 113] -> public function mapTypeFromForm(string $type)
+    [ 124] -> public function validerDonneesReclamation(array $donnees)
+    [ 149] -> public function preparerDonneesFormulaire(array $postData)
+    [ 165] -> public function recupererNumEtuParEmail(string $email)
+    [ 190] -> public function creerReclamation(array $donneesReclamation, string $numEtu, int $idUtilisateur)
+    [ 229] -> public function construireFiltres(array $queryParams)
+    [ 257] -> public function getSuiviReclamations(string $numEtu, int $page, int $limit, array $filtres)
+    [ 299] -> public function calculerStatistiquesEtudiant(string $numEtu)
+    [ 343] -> public function verifierDroitsAdmin(int $groupeUtilisateur)
+    [ 354] -> public function getReclamationsPourExport()
+    [ 368] -> public function getReclamationDetails(int $reclamationId, string $numEtu)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionRhService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionRhService
+    [  51] -> public function __construct($db)
+    [  68] -> public function saveEnseignant(array $data, int $userId)
+    [ 113] -> public function deleteMultipleEnseignants(array $ids, int $userId)
+    [ 131] -> public function getEnseignantById($id)
+    [ 143] -> public function savePersAdmin(array $data, int $userId)
+    [ 182] -> public function deleteMultiplePersAdmin(array $ids, int $userId)
+    [ 200] -> public function getPersAdminById($id)
+    [ 210] -> public function getReferenceLists()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionSallesService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionSallesService
+    [  27] -> public function __construct($db)
+    [  33] -> private function tableExists($tableName)
+    [  50] -> private function getProgrammationTable()
+    [  71] -> public function ajouterOuModifierSalle(array $postData)
+    [ 122] -> public function supprimerSallesMultiples(array $selectedIds)
+    [ 170] -> public function getSallePourModification($idSalle)
+    [ 183] -> public function getSallesAvecPagination(string $search = '', int $page = 1, int $limit = 10)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionScolariteService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionScolariteService
+    [  41] -> public function __construct($db)
+    [  54] -> public function getReferenceLists()
+    [ 104] -> public function getInfoEtudiant(string $numEtu)
+    [ 115] -> public function getVersementModifiable(int $id)
+    [ 131] -> public function enregistrerVersement(array $data, int $userId)
+    [ 204] -> public function mettreAJourVersement(array $data, int $userId)
+    [ 306] -> public function enregistrerPaiement(array $data, int $userId)
+    [ 329] -> private function enregistrerNouvelleInscription(array $data, int $userId)
+    [ 396] -> private function enregistrerVersementComplementaire(array $data, int $userId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\GestionUtilisateurService.php
+Namespace: CheckMaster\Services
+
+  Class: GestionUtilisateurService
+    [  61] -> public function __construct($db)
+    [  77] -> public function checkLoginAvailability(string $baseLogin)
+    [ 123] -> public function createPasswordResetToken(string $email)
+    [ 141] -> public function buildResetLink(string $token)
+    [ 153] -> private function normalizeEmailValue($email)
+    [ 163] -> private function recordExists(string $table, string $column, int $id)
+    [ 170] -> private function groupBelongsToType(int $groupId, int $typeId)
+    [ 182] -> private function resolveInvitationEmail(array $data, string $nomUtilisateur, int $idTypeUtilisateur, string $loginUtilisateur)
+    [ 197] -> private function safeAudit(callable $callback)
+    [ 206] -> private function buildCreateUserFailureMessage(\Throwable $e)
+    [ 228] -> public function addUtilisateur(array $data, int $userId)
+    [ 348] -> public function addUtilisateursEnMasse(array $selectedPersons, array $commonData, int $userId)
+    [ 438] -> public function updateUtilisateur(array $data, int $userId)
+    [ 482] -> public function enableMultipleUtilisateurs(array $ids, int $userId)
+    [ 501] -> public function disableMultipleUtilisateurs(array $ids, int $userId)
+    [ 520] -> public function sendAccessToMultipleUtilisateurs(array $ids, int $userId)
+    [ 586] -> public function getUtilisateurById($id)
+    [ 596] -> public function getNonUtilisateurs()
+    [ 610] -> public function getReferenceLists()
+    [ 626] -> public function generateRandomPassword(int $length = 12)
+    [ 647] -> public function envoyerEmailInscriptionPHPMailer($email, $nom, $login, $motDePasse = null, $resetLink = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\InscriptionService.php
+Namespace: CheckMaster\Services
+
+  Class: InscriptionService
+    [  21] -> public function __construct($db)
+    [  32] -> public function getIndexData(array $queryParams)
+    [  66] -> public function getInscriptionForReceipt(int $idInscription)
+    [  74] -> public function logPrint(int $idUtilisateur, string $status)
+    [  82] -> public function supprimerInscription(int $id, int $idUtilisateur)
+    [ 113] -> public function traiterInscription(array $postData, int $idUtilisateur)
+    [ 183] -> public function modifierInscription(array $postData, int $idUtilisateur)
+    [ 253] -> public function getEtudiantInfo(string $numEtu)
+    [ 265] -> public function getEtudiantsInscrits()
+    [ 277] -> private function creerEcheancesSiNecessaire($idInscription, $idNiveau, float $montantPremierVersement, int $nombreTranches)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\MenuService.php
+Namespace: CheckMaster\Services
+
+  Class: MenuService
+    [  19] -> public function __construct($db)
+    [  29] -> public function genererMenuHierarchique($idGroupe)
+    [ 136] -> public function genererMenuPlat($idGroupe)
+    [ 147] -> public function genererMenu($idGroupe)
+    [ 160] -> public function verifierAcces($idGroupe, $codeFonctionnalite, $typePermission = 'peut_voir')
+    [ 172] -> public function getPermissionsGroupe($idGroupe)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\NotesResultatsService.php
+Namespace: CheckMaster\Services
+
+  Class: NotesResultatsService
+    [  46] -> public function __construct($db)
+    [  61] -> public function getEtudiant($studentId)
+    [  72] -> public function getNotes($studentId)
+    [  83] -> public function getMoyenneGenerale($studentId)
+    [  95] -> public function getClassement($studentId)
+    [ 110] -> public function getSemestres($studentId)
+    [ 121] -> public function getNiveau($studentId)
+    [ 134] -> public function populateIndexGlobals($studentId)
+    [ 152] -> public function generatePdf($studentId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\NotesService.php
+Namespace: CheckMaster\Services
+
+  Class: NotesService
+    [  27] -> public function __construct($db)
+    [  41] -> private function resolveStudentNiveau(string $studentId)
+    [  66] -> public function getIndexData(array $queryParams)
+    [ 115] -> public function enregistrerNotes(string $studentId, int $anneeAcadId, float $moyenneM1, float $moyenneM2, int $idUtilisateur)
+    [ 149] -> public function getNotesByEtudiant(string $studentId, ?int $anneeAcadId = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ParametreService.php
+Namespace: CheckMaster\Services
+
+  Class: ParametreService
+    [  69] -> public function __construct($db)
+    [ 100] -> public function gestionAnnees(array $post, array $get, string $userId)
+    [ 194] -> public function gestionGrade(array $post, array $get, string $userId)
+    [ 254] -> public function gestionFonctionUtilisateur(array $post, array $get, string $userId)
+    [ 375] -> public function gestionSpecialite(array $post, array $get, string $userId)
+    [ 435] -> public function gestionNiveauEtude(array $post, array $get, string $userId)
+    [ 499] -> public function gestionStatutJury(array $post, array $get, string $userId)
+    [ 559] -> public function gestionNiveauApprobation(array $post, array $get, string $userId)
+    [ 619] -> public function gestionSemestre(array $post, array $get, string $userId)
+    [ 681] -> public function gestionNiveauAccesDonnees(array $post, array $get, string $userId)
+    [ 741] -> public function gestionTraitement(array $post, array $get, string $userId)
+    [ 804] -> public function gestionEntreprise(array $post, array $get, string $userId)
+    [ 864] -> public function gestionAction(array $post, array $get, string $userId)
+    [ 924] -> public function gestionFonction(array $post, array $get, string $userId)
+    [ 984] -> public function gestionMessagerie(array $post, array $get, string $userId)
+    [1046] -> public function gestionAttribution(array $post, array $get, string $userId, string $userGroupeId)
+    [1126] -> public function gestionMenus(array $post, array $get)
+    [1345] -> public function gestionReferentielSimple(array $post, array $get, string $userId)
+    [1545] -> public function gestionBaremeCritere(array $post, array $get, string $userId)
+    [1693] -> private function getReferentielSimpleConfig(string $action)
+    [1829] -> private function tableExists(string $table)
+    [1836] -> private function fetchReferentielRow(string $table, string $idColumn, $id)
+    [1848] -> private function fetchReferentielList(string $table, string $orderBy)
+    [1855] -> private function fetchReferentielOptions(string $table, string $idColumn, string $labelColumn, string $orderBy = '')
+    [1870] -> private function quoteIdentifier(string $identifier)
+    [1879] -> private function encodeBaremePk(int $idAnnee, int $idCritere)
+    [1884] -> private function decodeBaremePk(string $encoded)
+    [1905] -> private function handleAttributionSubmit(array $postData, string $userId, string $userGroupeId)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\PlanificationSoutenanceService.php
+Namespace: CheckMaster\Services
+
+  Class: PlanificationSoutenanceService
+    [  17] -> public function __construct($pdo = null)
+    [  23] -> private function getSelectedAcademicYearId()
+    [  28] -> private function tableExists(string $tableName)
+    [  46] -> private function getProgrammationTable()
+    [  58] -> private function requireProgrammationTable()
+    [  68] -> private function getProgrammationIdColumn(?string $table = null)
+    [  74] -> private function getProgrammationJuryColumn(?string $table = null)
+    [  80] -> private function getJuryTable()
+    [  92] -> private function getJuryRefColumn(?string $juryTable = null)
+    [  98] -> private function buildJuryJoinClause(string $progAlias = 'p', string $juryAlias = 'ej', ?string $progTable = null)
+    [ 113] -> private function getJuryPresenceExpression(string $progAlias = 'p', string $juryAlias = 'ej', ?string $progTable = null)
+    [ 124] -> private function getProgrammationAcademicYearId($idProgrammation)
+    [ 155] -> private function ensureWritableProgrammation($idProgrammation, string $context)
+    [ 170] -> public function etudiantDejaPlannifie($numEtu, $excludeId = null)
+    [ 204] -> public function getEtudiantsAvecJury()
+    [ 278] -> public function getEtudiantsDisponibles()
+    [ 288] -> public function getSalles()
+    [ 294] -> public function getPlanifications()
+    [ 343] -> public function planifier($idProgrammation, $idSalle, $dateSoutenance, $heureSoutenance, $editId = null)
+    [ 437] -> public function supprimer($idProgrammation)
+    [ 472] -> public function getPlanificationById($id)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ProcessusValidationService.php
+Namespace: CheckMaster\Services
+
+  Class: ProcessusValidationService
+    [  31] -> public function __construct($pdo)
+    [  36] -> private function tableExists($tableName)
+    [  53] -> private function columnExists($tableName, $columnName)
+    [  75] -> private function rapportTitleExpr($alias = 'r')
+    [  83] -> private function rapportDateExpr($alias = 'r')
+    [  94] -> private function getSelectedYearId()
+    [  99] -> private function yearCondition(string $alias = 'e')
+    [ 126] -> private function getRapportYearId(int $idRapport)
+    [ 155] -> public function getStatistiques()
+    [ 242] -> public function getRapportsAvecEvaluations()
+    [ 327] -> public function getEvaluationsRapport($id_rapport)
+    [ 360] -> public function getStatutVoteRapport($id_rapport)
+    [ 448] -> public function getMembresCommission()
+    [ 476] -> public function getDonneesPage()
+    [ 491] -> public function verifierIdEnseignant($id_enseignant)
+    [ 512] -> public function finaliserRapport($id_rapport, $id_enseignant, $commentaire = null)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\ProgrammationSoutenanceService.php
+Namespace: CheckMaster\Services
+
+  Class: ProgrammationSoutenanceService
+    [  17] -> public function __construct($pdo = null)
+    [  22] -> private function getSelectedAcademicYearId()
+    [  27] -> private function ensureWritableContext(string $context)
+    [  35] -> private function getStudentAcademicYearId(string $studentId)
+    [  48] -> private function ensureWritableStudent(string $studentId, string $context)
+    [  63] -> private function getAttributionAcademicYearId($id)
+    [  92] -> private function ensureWritableAttribution($id, string $context)
+    [ 107] -> private function tableExists($tableName)
+    [ 124] -> private function columnExists($tableName, $columnName)
+    [ 146] -> private function getProgrammationTable()
+    [ 157] -> private function getProgrammationIdColumn($table = null)
+    [ 163] -> private function getProgrammationJuryColumn($table = null)
+    [ 169] -> private function getJuryTable()
+    [ 180] -> private function getJuryRefColumn($juryTable = null)
+    [ 186] -> private function getRolesTable()
+    [ 197] -> private function normalizeRoleName($value)
+    [ 205] -> private function getRoleIds()
+    [ 245] -> private function getDefaultId($table, $idColumn)
+    [ 259] -> private function juryIdExpr($roleKey, $progAlias = 'p')
+    [ 277] -> private function juryNameExpr($roleKey, $progAlias = 'p')
+    [ 299] -> public function getEtudiantsForView()
+    [ 379] -> public function getEtudiantsDisponiblesForView()
+    [ 390] -> public function getEnseignants()
+    [ 419] -> public function getSalles()
+    [ 443] -> public function getProfesseursTitulaires()
+    [ 473] -> public function getAttributions()
+    [ 565] -> public function getEtudiantsValides()
+    [ 573] -> public function createAttribution(array $data)
+    [ 676] -> public function updateAttribution(array $data)
+    [ 754] -> public function deleteAttribution($id)
+    [ 806] -> private function insertJuryMembers($juryRef, array $data)
+    [ 835] -> public function getEnseignantJury()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\RedactionCompteRenduService.php
+Namespace: CheckMaster\Services
+
+  Class: RedactionCompteRenduService
+    [  18] -> public function __construct($pdo = null)
+    [  23] -> private function getSelectedYearId()
+    [  28] -> private function getRapportsValidesForSelectedYear()
+    [  69] -> public function getIndexData()
+    [  88] -> public function enregistrer(array $data)
+    [ 150] -> public function exporterPdf(string $contenu_CR, string $nom_CR)
+    [ 184] -> private function saveAffectations(array $rapports, array $encadrants, array $directeurs)
+    [ 205] -> private function sendNotificationEmails(array $rapports, string $nom_CR, string $pdf_path)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\RepertoireEnseignantService.php
+Namespace: CheckMaster\Services
+
+  Class: RepertoireEnseignantService
+    [  15] -> public function __construct($pdo = null)
+    [  20] -> private function tableExists(string $tableName)
+    [  37] -> private function getProgrammationTable()
+    [  45] -> private function getJuryTable()
+    [  53] -> private function getRolesTable()
+    [  61] -> private function getJuryRefColumn(string $juryTable)
+    [  66] -> private function getProgrammationJuryColumn(string $progTable)
+    [  71] -> public function index()
+    [ 161] -> public function getRapports(string $idEnseignant, ?int $annee, ?int $session, ?string $search, int $page, int $perPage)
+    [ 249] -> public function getComptesRendus(string $idEnseignant, ?int $annee, ?int $session, ?string $search, int $page, int $perPage)
+    [ 338] -> public function getMemoires(string $idEnseignant, ?int $annee, ?int $session, ?string $search, int $page, int $perPage)
+    [ 439] -> public function getQualitesJury(string $idEnseignant, ?int $annee, ?int $session)
+    [ 482] -> public function getStatsEnseignantsJury(?int $annee, ?int $session, int $page, int $perPage)
+    [ 560] -> private function buildPagination(int $total, int $currentPage, int $perPage)
+    [ 582] -> private function getAnneeOptions()
+    [ 601] -> private function getSessionOptions()
+    [ 618] -> public function getCurrentAnneeAcademique()
+    [ 635] -> private function getTabCounts(string $idEnseignant, ?int $annee, ?int $session, ?string $search)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\SauvegardeRestaurationService.php
+Namespace: CheckMaster\Services
+
+  Class: SauvegardeRestaurationService
+    [  18] -> public function __construct($db)
+    [  33] -> public function getDbConfig()
+    [  46] -> public function getBackups()
+    [  85] -> public function createBackup(?string $backupName, int $userId)
+    [ 141] -> public function restoreBackup(string $filename, int $userId)
+    [ 202] -> public function deleteBackup(string $filename, int $userId)
+    [ 228] -> public function downloadBackup(string $filename, int $userId)
+    [ 254] -> public function testRestore(string $filepath)
+    [ 338] -> public function diagnoseInsertQueries(string $filepath)
+    [ 424] -> private function getDockerContainerName()
+    [ 438] -> private function isDockerAvailable()
+    [ 458] -> private function isContainerRunning(string $containerName)
+    [ 465] -> private function createBackupWithPHP(string $filepath, array $dbConfig)
+    [ 509] -> public function restoreBackupWithPHP(string $filepath, array $dbConfig)
+    [ 582] -> private function truncateAllTables($pdo)
+    [ 598] -> public function splitSQL(string $sql)
+    [ 685] -> private function humanFileSize($size, int $precision = 2)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Services\VerificationRapportsService.php
+
+  Class: VerificationRapportsService
+    [  44] -> public function __construct($db)
+    [  53] -> private function tableExists($tableName)
+    [  70] -> private function columnExists($tableName, $columnName)
+    [  92] -> private function updateRapportEtape($idRapport, $etape, $fallbackStatut)
+    [ 104] -> private function filterRowsBySelectedYear(array $rows)
+    [ 109] -> private function getRapportYearId($idRapport)
+    [ 121] -> private function isInSelectedYear($idRapport)
+    [ 137] -> public function getIndexData()
+    [ 154] -> public function getStatsRapports()
+    [ 204] -> public function validerRapport($id_rapport, $commentaire)
+    [ 254] -> public function rejeterRapport($id_rapport, $commentaire)
+    [ 303] -> public function getRapportDetail($id_rapport)
+    [ 322] -> public function getDecisionsEvaluation($id_rapport)
+    [ 342] -> private function resolveCurrentAdminId()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\Support\Database.php
+Namespace: App\Support
+
+  Class: Database
+    [  20] -> public function pdo()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\AcademicYear.php
+
+  Class: AcademicYear
+    [  11] -> public static function fetchAll(\PDO $db)
+    [  45] -> public static function getActive(\PDO $db)
+    [  60] -> public static function getById(\PDO $db, ?int $id)
+    [  78] -> public static function getByLabel(\PDO $db, string $label)
+    [  94] -> public static function getAllQueryValue()
+    [  99] -> public static function getAllLabel()
+    [ 115] -> public static function bootstrapSession(\PDO $db, array $query, array &$session)
+    [ 206] -> public static function getSelectedIdFromSession()
+    [ 219] -> public static function getSelectedLabelFromSession()
+    [ 228] -> public static function getActiveIdFromSession()
+    [ 237] -> public static function getActiveLabelFromSession()
+    [ 246] -> public static function isAllSelectedFromSession()
+    [ 259] -> public static function isWriteAllowedFromSession()
+    [ 272] -> public static function getWritableIdFromSession()
+    [ 286] -> public static function getWritableLabelFromSession()
+    [ 306] -> public static function ensureWritableYear(\PDO $db, $yearId, string $context = 'cette operation')
+    [ 347] -> public static function filterRowsBySelectedYear(array $rows, string $field = 'id_annee_acad')
+    [ 367] -> private static function formatLabel(string $dateDebut, string $dateFin, string $fallback)
+    [ 376] -> private static function isAllSelectionValue($value)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\ComponentHelper.php
+
+  Class: ComponentHelper
+    [  13] -> public function __construct(?string $basePath = null)
+    [  25] -> public function render(string $path, array $params = [])
+    [  53] -> function cm_component(string $name, array $props = [])
+    [  81] -> function cm_render_component(string $name, array $props = [])
+    [  95] -> function cm_asset(string $path)
+    [ 119] -> function cm_render_param_crud_view(array $config)
+    [ 809] -> function cm_toolbar_filter_configs()
+    [ 999] -> function cm_toolbar(array $config = [])
+    [1917] -> function cm_data_table_selectable(array $config)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\EmailService.php
+
+  Class: EmailService
+    [  10] -> public function __construct()
+    [  16] -> private function configureMailer()
+    [  41] -> public function sendEmail($to, $subject, $message, $isHTML = false)
+    [  64] -> public function sendEmailWithAttachment($to, $subject, $message, $attachmentPath, $attachmentName = null, $isHTML = false)
+    [  94] -> public function sendTemplate($templateKey, $to, $data = [], $attachments = [])
+    [ 161] -> public function sendResultEmail($studentEmail, $studentName, $resume, $decision)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\ExcelImportService.php
+
+  Class: ExcelImportService
+    [  35] -> public function __construct($db)
+    [  40] -> private function tableExists($tableName)
+    [  47] -> private function getProgrammationTable()
+    [  52] -> private function getJuryTable()
+    [  57] -> private function getFirstAvailableId($table, $idColumn)
+    [  64] -> private function getNextProgrammationIdentifier()
+    [  78] -> public function importFile($filePath, $fileType = 'csv')
+    [  98] -> private function importCSV($filePath)
+    [ 145] -> private function importExcelAsCSV($filePath)
+    [ 151] -> private function processRow($row, $lineNumber)
+    [ 201] -> private function getOrCreateAcademicYear($anneeAcad)
+    [ 225] -> private function ensureInscription($numEtu, $anneeAcad, $idAnneeAcad)
+    [ 251] -> private function parseAcademicYear($anneeAcad)
+    [ 271] -> private function getOrCreateStudent($row)
+    [ 298] -> private function sanitizeForEmail($str)
+    [ 305] -> private function getOrCreateEnterprise($nomEntreprise)
+    [ 319] -> private function createStageInfo($numEtu, $idEntreprise, $row)
+    [ 341] -> private function createRapport($numEtu, $row)
+    [ 368] -> private function getOrCreateDefaultSpecialite()
+    [ 382] -> private function getOrCreateEnseignant($nomComplet)
+    [ 416] -> private function assignEncadrant($idEnseignant, $idRapport, $role)
+    [ 429] -> private function createValidation($idEnseignant, $idRapport, $row)
+    [ 445] -> private function createSoutenanceData($numEtu, $idRapport, $row)
+    [ 517] -> private function addJuryMember($programmationId, $idEnseignant, $idQualite)
+    [ 541] -> public function getSummary()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\FormattingUtils.php
+
+  Class: FormattingUtils
+    [  18] -> public static function formatMoney($amount)
+    [  29] -> public static function formatDecimal($number, $decimals = 2)
+    [  40] -> public static function formatDate($date, $format = 'd/m/Y')
+    [  60] -> public static function formatDateTime($datetime, $format = 'd/m/Y H:i')
+    [  70] -> public static function sanitizeText($text)
+    [  81] -> public static function formatPercentage($value, $decimals = 1)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\FormFieldStandards.php
+
+  Class: FormFieldStandards
+    [  19] -> public static function dateNaissance(array $overrides = [])
+    [  30] -> public static function anneeAcademique(array $overrides = [])
+    [  41] -> public static function nom(array $overrides = [])
+    [  52] -> public static function prenom(array $overrides = [])
+    [  63] -> public static function email(array $overrides = [])
+    [  74] -> public static function telephone(array $overrides = [])
+    [  85] -> public static function montant(array $overrides = [])
+    [  96] -> public static function numeroEtudiant(array $overrides = [])
+    [ 107] -> public static function description(array $overrides = [])
+    [ 121] -> public static function select(string $name, string $label, array $options = [], array $overrides = [])
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\FormHelper.php
+
+  Class: FormHelper
+    [  22] -> public function fieldConfig(string $entity, string $field)
+    [  30] -> public function entityFields(string $entity)
+    [  40] -> function cm_csrf_token()
+    [  64] -> function cm_csrf_verify(string $submitted)
+    [  94] -> function cm_old(string $field, $default = '')
+    [ 116] -> function cm_error(string $field)
+    [ 136] -> function cm_form_old_value(string $name, $default = '')
+    [ 143] -> function cm_form_field_error(string $name, string $default = '')
+    [ 156] -> function cm_form_attr_string(array $attrs)
+    [ 193] -> function cm_form_normalize_options(array $options)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\NavigationHelper.php
+Namespace: CheckMaster\Support
+
+  Class: NavigationHelper
+    [  16] -> public function buildMenu(array $user)
+    [  53] -> public function buildBreadcrumb(string $currentPath, array $menus)
+    [  82] -> public function buildTabs(string $group, string $activeTab)
+    [ 105] -> public function buildSteps(array $steps, int $currentStep = 0)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\PaginationHelper.php
+
+  Global Functions:
+    [   9] -> function cm_paginate(int $total, int $perPage, int $currentPage, int $window = 2)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\permissions_helper.php
+
+  Global Functions:
+    [  13] -> function canView($codeFonctionnalite = null)
+    [  47] -> function canCreate($codeFonctionnalite = null)
+    [  81] -> function canEdit($codeFonctionnalite = null)
+    [ 115] -> function canDelete($codeFonctionnalite = null)
+    [ 151] -> function showIfCan($action, $buttonHtml, $codeFonctionnalite = null)
+    [ 185] -> function showNoPermissionMessage($action = 'voir', $codeFonctionnalite = null)
+    [ 215] -> function getCurrentPermissions($codeFonctionnalite = null)
+    [ 238] -> function isAdmin()
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\PlanningDataUtils.php
+Namespace: App\Utils
+
+  Class: PlanningDataUtils
+    [  41] -> public function __construct(private readonly Database $db)
+    [  57] -> public function getSoutenancesForPlanning(?int $sessionId, ?string $dateFrom, ?string $dateTo)
+    [ 104] -> public function getJuryDetails(string $numSoutenance)
+    [ 154] -> public function getCompteRenduById(int $id)
+    [ 173] -> public function getSessionById(int $id)
+    [ 193] -> public function getRapportsForCompteRendu(int $idCR)
+    [ 230] -> public function getCommissionMembers(int $idCR)
+    [ 251] -> public function finaliserCompteRendu(int $idCR, string $cheminPdf)
+    [ 269] -> public function getSoutenanceWithFullDetails(string $numSoutenance)
+    [ 307] -> public function getJuryMembersForSoutenance(string $numSoutenance)
+    [ 326] -> public function getPvDataForSoutenance(string $numSoutenance)
+    [ 358] -> public function getNotesSoutenance(string $numEtudiant, ?int $idAnneeAcad = null)
+    [ 391] -> public function getMoyennesAcademiques(string $numEtu)
+    [ 419] -> public function getRapportWithDetails(int $rapportId)
+    [ 455] -> public function getEtudiantByNumCarte(string $numCarte)
+    [ 483] -> public function getCandidatureByEtudiant(string $numEtu)
+    [ 507] -> public function getInformationsStage(string $numEtu)
+    [ 536] -> public function updateRapport(int $rapportId, array $data)
+    [ 584] -> public function generateReference(string $type)
+    [ 602] -> public function saveDocumentRecord(array $data)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\ReceiptUtils.php
+
+  Class: ReceiptUtils
+    [   7] -> public static function numberToWords($number)
+    [ 119] -> public static function calculerProchainVersement($montantTotal, $montantPaye, $nombreTranches)
+    [ 130] -> public static function calculerDateProchainVersement($dateInscription, $nombreTranches)
+    [ 142] -> public static function genererNumeroRecu($id_inscription)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\RecuDataUtils.php
+Namespace: App\Utils
+
+  Class: RecuDataUtils
+    [  25] -> public function __construct(private readonly Database $db)
+    [  35] -> public function findVersementById(int $id)
+    [  72] -> public function findInscriptionById(int $id)
+    [ 101] -> public function findEtudiantByMatricule(string $matricule)
+    [ 126] -> public function marquerRecuGenere(int $versementId, string $cheminRecu, string $reference)
+    [ 143] -> public function generateReference(string $type)
+    [ 160] -> public function saveDocumentRecord(array $data)
+    [ 176] -> public static function intToWords(int $number)
+
+--------------------------------------------------------------------------------
+FILE: C:\wamp64\www\checkmaster.ufrmi-ufhb-ci\app\utils\TableHelper.php
+
+  Class: TableHelper
+    [  14] -> public function paginationData(int $total, int $page, int $perPage)
+    [  43] -> function cm_column(string $key, string $label, array $options = [])
+    [  64] -> function cm_action_column(array $actions = [])
+    [  86] -> function cm_table_cell($value)
+    [  93] -> function cm_table_sort_url(string $field, string $direction = 'asc')
+
+================================================================================
+SUMMARY STATISTICS
+--------------------------------------------------------------------------------
+Total Files with Code          : 162
+Total Classes/Traits/Interfaces : 162
+Total Methods                  : 1584
+Total Global Functions         : 9
+================================================================================

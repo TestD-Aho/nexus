@@ -1,0 +1,739 @@
+================================================================================
+GENERATION DE DOCUMENTS PDF - CHECKMASTER UFRMI
+================================================================================
+Document: 10_generation_documents_pdf.txt
+Version: 1.0
+Date: 2026-03-14
+Description: Documentation complete de tous les services de generation PDF.
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+  1. ARCHITECTURE GENERALE
+  2. PdfGeneratorService (Service de base - 400 lignes)
+  3. PvFinalGeneratorService (PV final de soutenance - 771 lignes)
+  4. PvCommissionGeneratorService (PV de commission - 333 lignes)
+  5. RapportPdfGeneratorService (Rapport etudiant - 459 lignes)
+  6. PlanningGeneratorService (Planning des soutenances - 316 lignes)
+  7. RecuGeneratorService (Recu de paiement - 321 lignes)
+  8. STRUCTURE DE STOCKAGE
+  9. TABLE document_genere
+
+================================================================================
+1. ARCHITECTURE GENERALE
+================================================================================
+
+Tous les services PDF heritent d'une logique commune implementee dans
+PdfGeneratorService. Ils utilisent la bibliotheque TCPDF pour la generation.
+
+Hierarchy:
+  PdfGeneratorService (base)
+    ├── PvFinalGeneratorService
+    ├── PvCommissionGeneratorService
+    ├── RapportPdfGeneratorService
+    ├── PlanningGeneratorService
+    └── RecuGeneratorService
+
+Dependances communes:
+  - TCPDF (via Composer ou inclusion directe)
+  - PdfGeneratorService (injecte via constructeur)
+  - Database (connexion PDO)
+  - PlanningDataUtils / RecuDataUtils (extraction des donnees)
+
+Namespace: App\Services\Document
+Classe de base: PdfGeneratorService (final)
+Classe utilitaire: SilentTcpdf (TCPDF sans header/footer automatiques)
+
+
+================================================================================
+2. PdfGeneratorService - Service de base
+================================================================================
+
+Fichier: app/Services/Document/PdfGeneratorService.php
+Lignes: ~400
+Namespace: App\Services\Document
+
+Description:
+  Service central de generation PDF. Wrapper autour de TCPDF avec
+  fonctionnalites d'en-tete institutionnel, de pied de page, et de
+  gestion du stockage organise.
+
+Constantes:
+  - DEFAULT_FONT_SIZE: 11
+  - DEFAULT_FONT_FAMILY: 'dejavuserif'
+  - TITLE_FONT_SIZE: 18
+  - HEADER_HEIGHT: 30 mm
+  - MARGIN_LEFT: 15 mm
+  - MARGIN_RIGHT: 15 mm
+  - MARGIN_TOP: 20 mm
+  - MARGIN_BOTTOM: 25 mm
+
+Constructeur:
+  __construct(string $storagePath, string $logoPath, ?object $configService = null)
+
+  Parametres:
+    - $storagePath: Racine du stockage des documents
+      (ex: storage/documents/)
+    - $logoPath: Chemin vers les logos institutionnels
+      (ex: public/assets/images/)
+    - $configService: Service de configuration optionnel
+      (pour recuperer app_name, logos depuis DB)
+
+Methodes principales:
+
+  2.1 createDocument()
+
+      Signature:
+        createDocument(
+          string $orientation = 'P',
+          string $format = 'A4',
+          string $title = '',
+          ?string $author = null
+        ): TCPDF
+
+      Description:
+        Cree un nouveau document PDF avec les parametres standard.
+        Configure les metadonnees, la police, les marges.
+
+      Parametres:
+        - orientation: 'P' (Portrait) ou 'L' (Landscape)
+        - format: 'A4', 'A5', etc.
+        - title: Titre du document (metadonnees PDF)
+        - author: Auteur (defaut: app_name ou 'CheckMaster UFRMI')
+
+      Configuration TCPDF:
+        - Font: dejavuserif (UTF-8)
+        - Font subsetting: active
+        - Marges: 15/15/20/25 mm
+        - Print header: false (personnalise)
+        - Print footer: false (personnalise)
+
+  2.2 addHeader()
+
+      Signature:
+        addHeader(TCPDF $pdf, string $title = '', ?string $subtitle = null): void
+
+      Description:
+        Ajoute un en-tete institutionnel standardise au PDF.
+        Contient les logos UFHB et UFR-MI, le titre de l'application,
+        et un titre de document optionnel.
+
+      Contenu de l'en-tete:
+        ┌──────────────────────────────────────────────────────────┐
+        │  [Logo UFHB]          TITRE          [Logo UFR-MI]      │
+        │                   Sous-titre                             │
+        └──────────────────────────────────────────────────────────┘
+
+      Resolution des logos:
+        1. Depuis configService (config DB: logo_url, logo_url2)
+        2. Depuis $logoPath passe au constructeur
+        3. Defaut: public/assets/images/ufhb_logo.png
+                    public/assets/images/ufrmi_logo.png
+
+      Taille logos: 25mm de hauteur maximum
+
+  2.3 save()
+
+      Signature:
+        save(TCPDF $pdf, string $subdir, string $filename): string
+
+      Description:
+        Sauvegarde le PDF dans la structure de stockage organisee.
+        Cree les repertoires si necessaire.
+
+      Chemin de sortie:
+        {storagePath}/{subdir}/{annee}/{filename}.pdf
+
+      Exemple:
+        storage/documents/pv_finaux/2026/PVF-2026-00001_20260314.pdf
+
+      Retourne: chemin absolu du fichier genere
+
+  2.4 writeHtml()
+
+      Signature:
+        writeHtml(TCPDF $pdf, string $html): void
+
+      Description:
+        Convertit du HTML en contenu PDF avec normalisation des polices.
+        Gere les styles inline, les tableaux, les listes.
+
+      Normalisation:
+        - Remplace les polices systeme par dejavuserif
+        - Ajuste les tailles de police
+        - Gere les caracteres speciaux UTF-8
+        - Convertit les balises <br>, <p>, <table>, etc.
+
+  2.5 addFooter()
+
+      Signature:
+        addFooter(TCPDF $pdf, ?string $customText = null): void
+
+      Description:
+        Ajoute un pied de page avec numero de page et texte optionnel.
+
+      Format:
+        "{texte personnalisé} - Page {X}/{Y} - {date}"
+
+  2.6 generateReference()
+
+      Signature:
+        generateReference(string $type, ?int $sequence = null): string
+
+      Description:
+        Genere une reference unique pour un document.
+
+      Format: {TYPE}-{ANNEE}-{SEQUENCE}
+      Exemples: PVF-2026-00001, PVC-2026-00042, RPT-2026-00123
+
+
+================================================================================
+3. PvFinalGeneratorService - PV Final de Soutenance
+================================================================================
+
+Fichier: app/Services/Document/PvFinalGeneratorService.php
+Lignes: 771
+Namespace: App\Services\Document
+
+Description:
+  Generation du proces-verbal final de soutenance avec 3 annexes.
+  Document le plus complexe du systeme.
+
+Dependances:
+  - PdfGeneratorService (injection)
+  - PlanningDataUtils (extraction donnees soutenance)
+
+Constantes de couleur:
+  - COULEUR_ANNEXE1: [70, 130, 180] (bleu acier)
+  - COULEUR_ANNEXE2: [107, 142, 35] (vert olive)
+  - COULEUR_ANNEXE3: [139, 0, 0] (rouge fonce)
+
+Constantes CRITERES_ANNEXE1:
+  [
+    {label: '1. Expose', bareme: 4.0, keywords: ['expose']},
+    {label: '2. Reponses aux questions posees', bareme: 5.0, keywords: ['question', 'reponse']},
+    {label: '3. Presentation du memoire', bareme: 2.0, keywords: ['presentation']},
+    {label: '4. Contenu du memoire', bareme: 4.0, keywords: ['contenu']},
+    {label: '5. Resolution du probleme', bareme: 5.0, keywords: ['resolution', 'probleme']},
+  ]
+
+  Total bareme: 20 points
+
+Methode principale:
+
+  3.1 generate()
+
+      Signature:
+        generate(string $soutenanceId, int $userId): array
+
+      Retour:
+        ['success' => bool, 'reference' => string, 'path' => string,
+         'pages' => int, 'error' => string]
+
+      Etapes:
+        1. Recuperation des donnees soutenance (getSoutenanceWithFullDetails)
+        2. Recuperation des donnees PV (getPvDataForSoutenance)
+        3. Formatage de la decision (formaterDecision)
+        4. Construction des 3 annexes
+        5. Generation du PDF
+        6. Sauvegarde et enregistrement en DB
+
+  3.2 buildAnnexe1Rows()
+
+      Signature:
+        buildAnnexe1Rows(string $matricule): array
+
+      Description:
+        Mappe les notes brutes d'evaluation vers les 5 criteres definis.
+        Utilise les mots-cles pour trouver les criteres correspondants
+        (compatibilite avec differents noms de criteres en base).
+
+      Logique:
+        Pour chaque critere dans CRITERES_ANNEXE1:
+          - Cherche dans les evaluations le critere matchant par mot-cle
+          - Normalise le score selon le bareme
+          - Calcule le total
+
+  3.3 extractJuryMembers()
+
+      Signature:
+        extractJuryMembers(array $jury): array
+
+      Description:
+        Extrait les membres du jury avec leurs roles.
+        Roles supportes:
+          - President du jury (PJ)
+          - Examinateur (EX)
+          - Directeur de memoire (DM)
+          - Encadrant (EN)
+          - Maitre de stage (MS)
+
+      Retour:
+        [
+          'president' => string,
+          'examinateur' => string,
+          'directeur' => string,
+          'encadreur' => string,
+          'maitre_stage' => string,
+        ]
+
+  3.4 Contenu des Annexes
+
+      ANNEXE 1 (Bleu): Notes de soutenance
+        - En-tete: "ANNEXE 1: NOTES DE SOUTENANCE"
+        - Tableau des criteres x notes par membre du jury
+        - Total des notes
+        - Decision du jury (ADMIS/AJOURNE/REFUSE)
+        - Signatures des membres du jury
+
+      ANNEXE 2 (Vert): Calcul pondere
+        - En-tete: "ANNEXE 2: CALCUL DE LA NOTE FINALE"
+        - Formule: (M1*2 + M2_S1*3 + Note_Memoire*3) / 8
+        - Detail du calcul avec valeurs
+        - Note finale et mention
+
+      ANNEXE 3 (Rouge): Calcul alternatif
+        - En-tete: "ANNEXE 3: CALCUL ALTERNATIF"
+        - Formule: (M1*1 + Note_Memoire*2) / 3
+        - Note finale alternative
+
+  3.5 formaterDecision()
+
+      Signature:
+        formaterDecision(string $decision): string
+
+      Mapping:
+        - 'ADMIS' -> 'ADMIS'
+        - 'AJOURNE' -> 'AJOURNE'
+        - 'REFUSE' -> 'REFUSE'
+        - autre / vide -> '-'
+
+Sortie:
+  - Fichier: pv_final_{num_soutenance}_{timestamp}.pdf
+  - Chemin: storage/documents/pv_finaux/{annee}/
+  - Table: document_genere (type_document='PVF')
+
+
+================================================================================
+4. PvCommissionGeneratorService - PV de Commission
+================================================================================
+
+Fichier: app/Services/Document/PvCommissionGeneratorService.php
+Lignes: 333
+Namespace: App\Services\Document
+
+Description:
+  Generation du proces-verbal de commission d'evaluation.
+  Documente les decisions de la commission sur les rapports evalues.
+
+Dependances:
+  - PdfGeneratorService
+  - PlanningDataUtils
+  - Database
+  - NotificationService (optionnel)
+
+Constantes:
+  - TYPE_DOCUMENT: 'PVC'
+  - SUBDIR: 'pv_commission'
+
+Regles metier:
+  - RG-PV-001: Un rapport = un seul PV
+  - RG-PV-002: PV finalise non modifiable
+
+Methode principale:
+
+  4.1 generate()
+
+      Signature:
+        generate(int $compteRenduId, int $userId): array
+
+      Etapes:
+        1. Transaction PDO debut
+        2. Recuperation du compte-rendu (getCompteRenduById)
+        3. Recuperation des rapports lies (compte_rendu_rapport)
+        4. Recuperation des etudiants et evaluations
+        5. Construction du HTML du PV
+        6. Generation PDF avec en-tete institutionnel
+        7. Sauvegarde du fichier
+        8. Mise a jour du compte-rendu avec chemin PDF
+        9. Enregistrement dans document_genere
+        10. Notification des etudiants
+        11. Transaction commit
+
+      En cas d'erreur: rollback de la transaction
+
+  4.2 Contenu du PV
+
+      Structure:
+        - En-tete institutionnel (logos UFHB + UFR-MI)
+        - Reference: PVC-{annee}-{numero}
+        - Date de generation
+        - Titre: "PROCES-VERBAL DE LA COMMISSION D'EVALUATION"
+
+      Sections:
+        1. Informations de session
+           - Periode d'evaluation
+           - Membres de la commission presents
+
+        2. Tableau des rapports evalues
+           - N° | Etudiant | Sujet | Decision | Commentaire
+           - Pour chaque rapport: nom etudiant, theme, resultat
+
+        3. Affectations des encadrants
+           - Etudiant | Encadrant | Directeur
+
+        4. Recommandations de la commission
+           - Texte libre du compte-rendu
+
+        5. Signatures
+           - President de la commission
+           - Membres
+
+      Reference generee: PVC-{annee}-{sequence}
+
+
+================================================================================
+5. RapportPdfGeneratorService - Rapport Etudiant
+================================================================================
+
+Fichier: app/Services/Document/RapportPdfGeneratorService.php
+Lignes: 459
+Namespace: App\Services\Document
+
+Description:
+  Generation du PDF du rapport de memoire de l'etudiant.
+  Inclut une page de couverture formelle et le contenu du rapport.
+
+Dependances:
+  - PdfGeneratorService
+  - RapportEtudiant (model)
+  - Etudiant (model)
+  - InfoStage (model)
+
+Methode principale:
+
+  5.1 generate()
+
+      Signature:
+        generate(int $rapportId, int $userId): array
+
+      Etapes:
+        1. Recuperation du rapport (rapport_etudiants)
+        2. Recuperation des infos etudiant
+        3. Recuperation des infos stage (entreprise, sujet)
+        4. Construction de la page de couverture
+        5. Conversion du contenu HTML en pages PDF
+        6. Sauvegarde et enregistrement
+
+  5.2 Page de couverture
+
+      Contenu:
+        ┌──────────────────────────────────────────────────────┐
+        │                                                      │
+        │                 [Logo UFHB] [Logo UFR-MI]            │
+        │                                                      │
+        │         UNIVERSITE FELIX HOUPHOUET BOIGNY            │
+        │            UFR MATHEMATIQUES ET INFORMATIQUE         │
+        │                                                      │
+        │  ═══════════════════════════════════════════════════  │
+        │                                                      │
+        │              RAPPORT DE STAGE / MEMOIRE              │
+        │                                                      │
+        │  Theme: {theme_rapport}                              │
+        │                                                      │
+        │  Presente par:                                       │
+        │    Nom: {nom} {prenom}                               │
+        │    Matricule: {matricule}                            │
+        │    Niveau: {niveau_etude}                            │
+        │                                                      │
+        │  Entreprise d'accueil:                               │
+        │    {nom_entreprise}                                  │
+        │    {adresse_entreprise}                              │
+        │                                                      │
+        │  Maitre de stage:                                    │
+        │    {nom_maitre_stage}                                │
+        │                                                      │
+        │  Annee academique: {annee_academique}                │
+        │                                                      │
+        └──────────────────────────────────────────────────────┘
+
+  5.3 Contenu du rapport
+
+      - Conversion HTML -> PDF via writeHtml()
+      - Support du format unifie (contenu_rapport HTML)
+      - Support du format legacy (fichiers separes)
+      - Gestion des images inline
+      - Numerotation automatique des pages
+
+Sortie:
+  - Fichier: rapport_{matricule}_{annee}_{timestamp}.pdf
+  - Chemin: storage/documents/rapports/{annee}/
+  - Table: document_genere (type_document='RPT')
+
+
+================================================================================
+6. PlanningGeneratorService - Planning des Soutenances
+================================================================================
+
+Fichier: app/Services/Document/PlanningGeneratorService.php
+Lignes: 316
+Namespace: App\Services\Document
+
+Description:
+  Generation du planning des soutenances en format A4 LANDSCAPE.
+  Conforme au modele MIAGE-GI de l'UFR-MI.
+
+Dependances:
+  - PdfGeneratorService
+  - PlanningDataUtils
+  - Database
+  - NotificationService (optionnel)
+
+Constantes:
+  - TYPE_DOCUMENT: 'PLN'
+  - SUBDIR: 'planning'
+
+Methode principale:
+
+  6.1 generate()
+
+      Signature:
+        generate(
+          ?int $sessionId,
+          ?string $dateFrom,
+          ?string $dateTo,
+          int $userId
+        ): array
+
+      Parametres:
+        - sessionId: ID de session (null = toutes les sessions)
+        - dateFrom: Date de debut (YYYY-MM-DD)
+        - dateTo: Date de fin (YYYY-MM-DD)
+        - userId: Utilisateur generateur
+
+      Etapes:
+        1. Transaction PDO
+        2. Recuperation des soutenances (getSoutenancesForPlanning)
+        3. Grouper par date
+        4. Generation du PDF landscape
+        5. En-tete institutionnel par page
+        6. Sauvegarde
+        7. Notification des etudiants
+
+  6.2 Format du planning
+
+      Format: A4 LANDSCAPE (297 x 210 mm)
+
+      En-tete par page:
+        ┌──────────────────────────────────────────────────────────┐
+        │  [Logo]     PLANNING DES SOUTENANCES - {Date}          │
+        └──────────────────────────────────────────────────────────┘
+
+      Tableau:
+        ┌──────────────────────────────────────────────────────────────────────────┐
+        │ N° │ Nom Etudiant │ Jury Composition │ Heure │ Theme │ Entreprise │ Salle│
+        ├──────────────────────────────────────────────────────────────────────────┤
+        │ 1  │ DUPONT Jean  │ Prof X (PJ)     │ 09:00 │ ...   │ SOCIEL     │ S207 │
+        │    │              │ Prof Y (EX)     │       │       │            │      │
+        │    │              │ Dr Z (EN)       │       │       │            │      │
+        ├──────────────────────────────────────────────────────────────────────────┤
+        │ 2  │ MARTIN Marie │ ...             │ 10:00 │ ...   │ TECH-PRO   │ CONF │
+        └──────────────────────────────────────────────────────────────────────────┘
+
+      Groupement: Soutenances groupees par date, triees par heure
+
+      Marquage visuel des salles:
+        - S. CONF = Salle de conference
+        - S. 207 = Salle 207
+        - Autres salles depuis la table salles
+
+  6.3 Notification
+
+      Apres generation:
+        - Email aux etudiants dont la soutenance est programmee
+        - EmailService::sendEmail() ou sendEmailWithAttachment()
+
+
+================================================================================
+7. RecuGeneratorService - Recu de Paiement
+================================================================================
+
+Fichier: app/Services/Document/RecuGeneratorService.php
+Lignes: 321
+Namespace: App\Services\Document
+
+Description:
+  Generation des recus de paiement pour les versements d'inscription.
+  Format A5 paysage avec toutes les informations de paiement.
+
+Dependances:
+  - PdfGeneratorService
+  - RecuDataUtils
+  - Database
+
+Constantes:
+  - TYPE_DOCUMENT: 'REC'
+  - SUBDIR: 'recus'
+
+Regles metier:
+  - RG-DOC-005: Recu auto-genere apres chaque paiement
+
+Methode principale:
+
+  7.1 generate()
+
+      Signature:
+        generate(string|int $versementId, int $userId): array
+
+      Etapes:
+        1. Transaction PDO
+        2. Recuperation du versement (findVersementById)
+        3. Recuperation de l'inscription liee
+        4. Recuperation des infos etudiant
+        5. Construction du recu
+        6. Generation PDF A5 landscape
+        7. Sauvegarde
+        8. Mise a jour du versement avec reference recu
+        9. Enregistrement document_genere
+
+  7.2 Format du recu
+
+      Format: A5 LANDSCAPE (210 x 148 mm)
+
+      Contenu:
+        ┌────────────────────────────────────────────────────────────┐
+        │  [Logo]    UNIVERSITE FELIX HOUPHOUET BOIGNY              │
+        │            UFR MATHEMATIQUES ET INFORMATIQUE              │
+        │            RECU DE PAIEMENT N° R{ID_ZERO_PADDED}          │
+        ├────────────────────────────────────────────────────────────┤
+        │                                                            │
+        │  Recu de: {nom_prenom_etudiant}                            │
+        │  Matricule: {matricule}                                    │
+        │  Niveau: {niveau_etude}                                    │
+        │                                                            │
+        │  Annee academique: {annee_academique}                      │
+        │                                                            │
+        │  Montant verse: {montant} FCFA                             │
+        │  Montant en lettres: {montant_en_lettres}                  │
+        │                                                            │
+        │  Date de paiement: {date_paiement}                         │
+        │  Motif: Frais d'inscription / {type_paiement}              │
+        │  Mode de paiement: {mode_paiement}                         │
+        │                                                            │
+        │  Prochain versement prevu: {date_prochain_versement}       │
+        │                                                            │
+        │  Signature du comptable        Cachet de l'universite     │
+        │                                                            │
+        └────────────────────────────────────────────────────────────┘
+
+      Numero de recu: R + ID zero-padded (ex: R00042)
+
+  7.3 Conversion montant en lettres
+
+      Methode: ReceiptUtils::numberToWords()
+
+      Exemples:
+        - 50000 -> "Cinquante mille"
+        - 150000 -> "Cent cinquante mille"
+        - 25000 -> "Vingt-cinq mille"
+
+      Conversion en francais (CFA francs).
+
+
+================================================================================
+8. STRUCTURE DE STOCKAGE
+================================================================================
+
+Racine: storage/documents/
+
+  storage/documents/
+  ├── rapports/
+  │   └── {annee}/
+  │       ├── rapport_{matricule}_{annee}_{timestamp}.pdf
+  │       └── ...
+  │
+  ├── pv_finaux/
+  │   └── {annee}/
+  │       ├── pv_final_{num_soutenance}_{timestamp}.pdf
+  │       └── ...
+  │
+  ├── pv_commission/
+  │   └── {annee}/
+  │       ├── pv_commission_{annee}_{id}_{timestamp}.pdf
+  │       └── ...
+  │
+  ├── plannings/
+  │   └── {annee}/
+  │       ├── planning_{session}_{date}_{timestamp}.pdf
+  │       └── ...
+  │
+  └── recus/
+      └── {annee}/
+          ├── recu_{versement_id}_{timestamp}.pdf
+          └── ...
+
+Chaque sous-repertoire est organise par annee academique pour faciliter
+l'archivage et la recherche.
+
+Les repertoires sont crees automatiquement par PdfGeneratorService::save()
+si ils n'existent pas (mkdir avec recursive=true).
+
+
+================================================================================
+9. TABLE document_genere
+================================================================================
+
+Table: document_genere
+Description: Trace de tous les documents PDF generes dans le systeme.
+
+Schema:
+  - id_document (PK, auto-increment)
+  - type_document (varchar): Type du document
+    * 'PVF' = PV Final de soutenance
+    * 'PVC' = PV de commission
+    * 'RPT' = Rapport etudiant
+    * 'PLN' = Planning des soutenances
+    * 'REC' = Recu de paiement
+  - reference (varchar): Reference unique du document
+    Format: {TYPE}-{ANNEE}-{SEQUENCE}
+    Exemple: PVF-2026-00001
+  - chemin_fichier (varchar): Chemin relatif vers le PDF
+  - nom_fichier (varchar): Nom du fichier PDF
+  - id_utilisateur (FK): Utilisateur ayant genere le document
+  - id_annee_acad (FK): Annee academique concernee
+  - date_generation (datetime): Date et heure de generation
+  - taille_fichier (int): Taille du fichier en octets
+  - statut (varchar): Statut du document
+    * 'genere' = Document genere avec succes
+    * 'erreur' = Erreur lors de la generation
+  - metadata (json): Donnees supplementaires (optionnel)
+
+Utilisation:
+  - Chaque service PDF enregistre le document genere dans cette table
+  - Permet de tracer l'historique des generations
+  - Utilise pour le suivi et l'audit
+  - Reference utilisee pour la recherche de documents
+
+
+================================================================================
+RESUME DES SERVICES PDF
+================================================================================
+
+┌────────────────────────────────┬────────┬────────────┬───────────────┐
+│ Service                        │Lignes  │ Format     │ Sortie        │
+├────────────────────────────────┼────────┼────────────┼───────────────┤
+│ PdfGeneratorService (base)     │ 400    │ Variable   │ N/A (base)    │
+│ PvFinalGeneratorService        │ 771    │ A4 Portrait│ pv_finaux/    │
+│ PvCommissionGeneratorService   │ 333    │ A4 Portrait│ pv_commission/│
+│ RapportPdfGeneratorService     │ 459    │ A4 Portrait│ rapports/     │
+│ PlanningGeneratorService       │ 316    │ A4 Landscape│ plannings/   │
+│ RecuGeneratorService           │ 321    │ A5 Landscape│ recus/       │
+├────────────────────────────────┼────────┼────────────┼───────────────┤
+│ TOTAL                          │ 2600   │            │               │
+└────────────────────────────────┴────────┴────────────┴───────────────┘
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

@@ -1,0 +1,782 @@
+================================================================================
+  DOCUMENTATION TECHNIQUE CHECKMASTER — BASE DE DONNÉES ET ALIGNEMENT
+  Schéma complet ufrmi1802974_2q2mpf — Audit et vérification d'alignement
+  Date : 14 mars 2026
+================================================================================
+
+
+1. INFORMATIONS GÉNÉRALES
+=========================
+
+Serveur   : MySQL 8.4.7
+Base      : ufrmi1802974_2q2mpf
+Charset   : utf8mb3 / utf8mb4
+Hôte      : 127.0.0.1:3306 (localhost)
+Nombre total de tables : 55+
+
+
+2. SCHEMA COMPLET — TOUTES LES TABLES
+=====================================
+
+
+2.1 TABLE action
+----------------
+Colonne         | Type           | Contrainte
+----------------|----------------|--------------------------
+id_action       | int            | PK AUTO_INCREMENT
+lib_action      | varchar(120)   | NOT NULL
+
+Référencée par : audit_log (FK id_action)
+
+
+2.2 TABLE affecter
+------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_enseignant   | varchar(20)    | PK (composite), FK → enseignants
+id_rapport      | int            | PK (composite), FK → rapport_etudiants
+role            | enum           | 'encadrant', 'directeur'
+id_jury         | int            | FK nullable → jury
+
+Index : Key_affecter_enseignant, Key_affecter_rappetu, Key_affecter_jury
+
+
+2.3 TABLE annee_academique
+--------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|--------------------------
+id_annee_acad   | int            | PK
+date_deb        | date           | NOT NULL
+date_fin        | date           | NOT NULL
+
+Données : 25 enregistrements (2000-2026)
+
+
+2.4 TABLE app_settings
+----------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+setting_key     | varchar(100)   | PK
+setting_value   | text           | NOT NULL
+is_sensitive    | tinyint(1)     | DEFAULT 0
+updated_at      | timestamp      | CURRENT_TIMESTAMP ON UPDATE
+
+Contenu : smtp_password (paramètre SMTP)
+
+
+2.5 TABLE auth_rate_limits
+--------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id              | int            | PK AUTO_INCREMENT
+action          | varchar(16)    | NOT NULL
+ip              | varchar(45)    | NOT NULL
+identifier      | varchar(128)   | NOT NULL
+attempts        | int            | DEFAULT 0
+window_start    | datetime       | NOT NULL
+last_attempt    | datetime       | NOT NULL
+blocked_until   | datetime       | NULL
+created_at      | timestamp      | DEFAULT CURRENT_TIMESTAMP
+updated_at      | timestamp      | NULL ON UPDATE
+
+Index UNIQUE : uniq_action_ip_identifier (action, ip, identifier)
+Utilisée par : DbRateLimiter
+
+
+2.6 TABLE avoir
+---------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_grade        | varchar(2)     | PK (composite), FK → grade
+id_enseignant   | varchar(20)    | PK (composite), FK → enseignants
+date_grade      | date           | NOT NULL
+
+Relation N:N enseignant ↔ grade
+
+
+2.7 TABLE bareme_critere
+------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_annee_acad   | int            | PK (composite), FK → annee_academique
+id_critere      | varchar(2)     | PK (composite), FK → critere_evaluation
+bareme          | int            | NOT NULL
+
+Données : baremes pour l'année 22524 (CM=4, EX=4, PM=2, RP=5, RQ=5)
+
+
+2.8 TABLE candidature_soutenance
+--------------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_candidature       | int            | PK AUTO_INCREMENT
+num_etu              | varchar(25)    | NOT NULL, FK → etudiants
+date_candidature     | datetime       | NOT NULL
+statut_candidature   | enum           | 'En attente', 'Validée', 'Rejetée'
+date_traitement      | datetime       | NULL
+id_pers_admin        | int            | NULL, FK → personnel_admin
+commentaire_admin    | text           | NULL
+
+
+2.9 TABLE categories_fonctionnalites
+-------------------------------------
+Colonne                 | Type           | Contrainte
+------------------------|----------------|-------------------------------------------
+id_categorie            | int            | PK AUTO_INCREMENT
+code_categorie          | varchar(50)    | NOT NULL UNIQUE
+lib_categorie           | varchar(100)   | NOT NULL
+description_categorie   | text           | NULL
+icone_categorie         | varchar(100)   | NULL
+ordre_categorie         | int            | DEFAULT 0
+actif                   | tinyint(1)     | DEFAULT 1
+date_creation           | timestamp      | DEFAULT CURRENT_TIMESTAMP
+
+Catégories : SCOLARITE, ETUDIANT_ENV, COMMISSION, ADMIN_PLATEFORME,
+             SOUTENANCE, PROFIL, ENV_ENSEIGNANT
+
+
+2.10 TABLE compte_rendu
+-----------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_CR                | int            | PK AUTO_INCREMENT
+num_etu              | varchar(25)    | NOT NULL, FK → etudiants
+nom_CR               | varchar(70)    | NOT NULL
+contenu_CR           | longtext       | NULL
+chemin_fichier_pdf   | varchar(255)   | NULL
+date_CR              | datetime       | NOT NULL
+
+
+2.11 TABLE compte_rendu_rapport
+--------------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_CR           | int            | PK (composite), FK → compte_rendu
+id_rapport      | int            | PK (composite)
+
+Relation N:N CR ↔ rapport
+
+
+2.12 TABLE critere_evaluation
+-----------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_critere      | varchar(2)     | PK
+lib_critere     | varchar(100)   | NOT NULL
+
+Données : CM=Contenu du mémoire, EX=Exposé, PM=Présentation du mémoire,
+          RP=Résolution du problème, RQ=Réponses aux questions posées
+
+
+2.13 TABLE decisions_jury
+-------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_decision     | int            | PK AUTO_INCREMENT
+lib_decision    | varchar(120)   | NOT NULL
+description     | text           | NULL
+actif           | tinyint(1)     | DEFAULT 1
+
+
+2.14 TABLE deposer
+-------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+num_etu         | varchar(25)    | PK (composite), FK → etudiants
+id_rapport      | int            | PK (composite), FK → rapport_etudiants
+date_depot      | datetime       | NOT NULL
+
+Relation N:N étudiant ↔ rapport (dépôt)
+
+
+2.15 TABLE document
+-------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_document     | int            | PK AUTO_INCREMENT
+lien_document   | varchar(255)   | NOT NULL
+
+
+2.16 TABLE domaine
+------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_domaine      | int            | PK
+lib_domaine     | varchar(150)   | NOT NULL
+
+Données : 6 domaines (SI, ERP, WEB, BD/GL, Audit, BI)
+
+
+2.17 TABLE enseignants
+----------------------
+Colonne                | Type           | Contrainte
+-----------------------|----------------|-------------------------------------------
+id_enseignant          | varchar(20)    | PK
+nom_enseignant         | varchar(50)    | NOT NULL
+prenom_enseignant      | varchar(100)   | NOT NULL
+tel_enseignant         | varchar(20)    | NULL
+mail_enseignant        | varchar(100)   | NULL
+id_specialite          | int            | FK → specialite
+type_enseignant        | int            | FK nullable
+id_etablissement_origin| int            | FK → etablissement_origine
+
+
+2.18 TABLE enseignant_jury (anciennement composer_jury)
+-------------------------------------------------------
+Colonne             | Type           | Contrainte
+--------------------|----------------|-------------------------------------------
+num_soutenance      | varchar(20)    | PK (composite)
+id_enseignant       | varchar(20)    | PK (composite), FK → enseignants
+id_qualite_jury     | varchar(2)     | PK (composite), FK → qualite_jury
+date_composer_jury  | datetime       | NULL
+
+Note : Le code référence parfois cette table comme "composer_jury".
+       Le vrai nom SQL est "enseignant_jury".
+
+
+2.19 TABLE entreprises
+----------------------
+Colonne                | Type           | Contrainte
+-----------------------|----------------|-------------------------------------------
+id_entreprise          | int            | PK
+lib_long_entreprise    | varchar(100)   | NOT NULL
+lib_court_en           | varchar(50)    | NOT NULL
+logo                   | varchar(256)   | NULL
+email                  | varchar(100)   | NULL
+telephone              | varchar(20)    | NULL
+
+Données : 49 entreprises partenaires
+
+
+2.20 TABLE etablissement_origine
+--------------------------------
+Colonne             | Type           | Contrainte
+--------------------|----------------|-------------------------------------------
+id_etablissement    | int            | PK
+libelle_long        | varchar(120)   | NOT NULL
+libelle_court       | varchar(30)    | NOT NULL
+
+Données : 1=UFHB, 2=INPHB, 3=UNA, 4=Entreprise
+
+
+2.21 TABLE etudiants
+--------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+num_ident_etud    | varchar(25)    | UNIQUE
+num_carte_etud    | varchar(25)    | PK
+nom_etu           | varchar(50)    | NOT NULL
+prenom_etu        | varchar(100)   | NOT NULL
+date_naiss_etu    | date           | NULL
+id_genre          | char(1)        | FK → genre
+email_etu         | varchar(100)   | NULL
+promotion_etu     | varchar(30)    | NULL
+
+
+2.22 TABLE evaluations_rapports
+-------------------------------
+Colonne               | Type           | Contrainte
+----------------------|----------------|-------------------------------------------
+id_evaluation         | int            | PK AUTO_INCREMENT
+id_rapport            | int            | FK → rapport_etudiants
+id_evaluateur         | int            | FK → utilisateur
+decision_evaluation   | enum           | 'valider', 'rejeter'
+commentaire           | text           | NULL
+date_evaluation       | datetime       | NOT NULL
+date_modification     | datetime       | NULL
+
+
+2.23 TABLE evaluer
+------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+num_etudiant      | varchar(25)    | PK (composite), FK → etudiants
+num_jury          | varchar(20)    | PK (composite)
+id_critere        | varchar(2)     | PK (composite), FK → critere_evaluation
+date_eval         | date           | NULL
+note              | decimal(4,2)   | NULL
+
+Évaluations critères par jury pour chaque étudiant.
+
+
+2.24 TABLE filiere
+------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_filiere      | int            | PK
+lib_filiere     | varchar(100)   | NOT NULL
+
+
+2.25 TABLE fonction
+-------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_fonction          | int            | PK
+lib_fonction         | varchar(100)   | NOT NULL
+origine_entreprise   | tinyint(1)     | NULL
+
+
+2.26 TABLE fonctionnalites
+--------------------------
+Colonne                 | Type           | Contrainte
+------------------------|----------------|-------------------------------------------
+id_fonctionnalite       | int            | PK AUTO_INCREMENT
+id_categorie            | int            | FK → categories_fonctionnalites
+code_fonctionnalite     | varchar(50)    | UNIQUE
+slug_permission         | varchar(100)   | UNIQUE
+lib_fonctionnalite      | varchar(100)   | NOT NULL
+label_fonctionnalite    | varchar(100)   | NULL
+url_fonctionnalite      | varchar(200)   | NULL
+icone_fonctionnalite    | varchar(50)    | NULL
+ordre_fonctionnalite    | int            | DEFAULT 0
+est_sous_page           | tinyint(1)     | DEFAULT 0
+page_parente            | varchar(100)   | NULL
+actif                   | tinyint(1)     | DEFAULT 1
+
+
+2.27 TABLE frais_inscription
+----------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_niv_etude    | varchar(2)     | PK (composite), FK → niveau_etude
+id_annee_acad   | int            | PK (composite), FK → annee_academique
+montant         | decimal(10,2)  | NOT NULL
+
+
+2.28 TABLE genre
+----------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_genre        | char(1)        | PK
+libelle_genre   | varchar(20)    | NOT NULL
+
+Données : F=Féminin, M=Masculin, N=Neutre
+
+
+2.29 TABLE grade
+----------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_grade        | varchar(2)     | PK
+lib_grade       | varchar(50)    | NOT NULL
+
+Données : AS=Assistant, MA=Maître assistant, MC=Maître de conférence,
+          PT=Professeur titulaire
+
+
+2.30 TABLE groupe_utilisateur
+-----------------------------
+Colonne             | Type           | Contrainte
+--------------------|----------------|-------------------------------------------
+id_GU               | int            | PK
+lib_GU              | varchar(50)    | NOT NULL
+id_type_utilisateur | int            | FK → type_utilisateur
+
+
+2.31 TABLE informations_stage
+-----------------------------
+Colonne             | Type           | Contrainte
+--------------------|----------------|-------------------------------------------
+id_info_stage       | int            | PK AUTO_INCREMENT
+num_etu             | varchar(25)    | FK → etudiants
+id_entreprise       | int            | FK → entreprises
+date_debut_stage    | date           | NULL
+date_fin_stage      | date           | NULL
+sujet_stage         | text           | NULL
+id_maitre_stage     | int            | FK → maitre_de_stage
+
+
+2.32 TABLE inscriptions
+-----------------------
+Colonne            | Type           | Contrainte
+-------------------|----------------|-------------------------------------------
+num_carte_etud     | varchar(25)    | PK (composite), FK → etudiants
+id_annee_acad      | int            | PK (composite), FK → annee_academique
+num_versement      | varchar(30)    | PK (composite)
+date_inscription   | date           | NOT NULL
+date_versement     | date           | NULL
+id_niv_etude       | varchar(2)     | FK → niveau_etude
+montant_verser     | decimal(10,2)  | DEFAULT 0
+methode_paiement   | varchar(2)     | FK → mode_paiement
+num_piece_mp       | varchar(50)    | NULL
+solde              | decimal(10,2)  | DEFAULT 0
+fiche_inscription  | varchar(255)   | NULL
+
+
+2.33 TABLE maitre_de_stage
+--------------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+id_maitre_stage   | int            | PK AUTO_INCREMENT
+Nom               | varchar(100)   | NOT NULL
+prenom            | varchar(100)   | NULL
+email             | varchar(100)   | NULL
+telephone         | varchar(20)    | NULL
+id_entreprise     | int            | FK → entreprises
+id_fonction       | int            | FK → fonction
+
+
+2.34 TABLE mentions
+-------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_mention      | int            | PK
+lib_mention     | varchar(50)    | NOT NULL
+actif           | tinyint(1)     | DEFAULT 1
+
+Données : 1=Insuffisant, 2=Passable, 3=Assez-Bien, 4=Bien,
+          5=Très-Bien, 6=Honorable
+
+
+2.35 TABLE messages
+-------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+id_message        | int            | PK AUTO_INCREMENT
+contenu_message   | text           | NULL
+lib_message       | varchar(100)   | NULL
+type_message      | varchar(50)    | NULL
+
+
+2.36 TABLE mode_paiement
+------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_mode_paiement     | varchar(2)     | PK
+libelle_mode_paement | varchar(50)    | NOT NULL
+
+Données : CH=Chèque, ES=Espèce, MN=Mtn money, MV=Moov money,
+          OM=Orange money, VR=Virement, WV=Wave
+
+
+2.37 TABLE niveau_acces_donnees
+-------------------------------
+Colonne                   | Type           | Contrainte
+--------------------------|----------------|-------------------------------------------
+id_niveau_acces_donnees   | int            | PK
+lib_niveau_acces_donnees  | varchar(50)    | NOT NULL
+
+Données : 4=Lecture seule, 5=Écriture
+
+
+2.38 TABLE niveau_approbation
+-----------------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_approb       | int            | PK
+lib_approb      | varchar(50)    | NOT NULL
+
+
+2.39 TABLE niveau_etude
+-----------------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_niv_etude    | varchar(2)     | PK
+lib_niv_etude   | varchar(50)    | NOT NULL
+
+Données : M2=Master 2
+
+
+2.40 TABLE notes
+----------------
+Colonne          | Type           | Contrainte
+-----------------|----------------|-------------------------------------------
+num_etu          | varchar(25)    | PK, FK → etudiants
+id_annee_acad    | int            | FK → annee_academique
+moyenne_M1       | decimal(4,2)   | NULL
+moyenne_M2       | decimal(4,2)   | NULL
+date_creation    | datetime       | NULL
+date_modification| datetime       | NULL
+
+
+2.41 TABLE personnel_admin
+--------------------------
+Colonne                 | Type           | Contrainte
+------------------------|----------------|-------------------------------------------
+id_pers_admin           | int            | PK AUTO_INCREMENT
+nom_pers_admin          | varchar(50)    | NOT NULL
+prenom_pers_admin       | varchar(100)   | NOT NULL
+tel_pers_admin          | varchar(20)    | NULL
+email_pers_admin        | varchar(100)   | UNIQUE
+poste                   | varchar(50)    | NULL
+date_embauche           | date           | NULL
+id_etablissement_origin | int            | FK → etablissement_origine
+
+
+2.42 TABLE programmer_soutenance
+--------------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+num_soutenance       | varchar(20)    | PK
+num_carte_etud       | varchar(25)    | FK → etudiants
+date_soutenance      | datetime       | NULL
+id_salle             | int            | FK → salles
+annee_soutenance     | varchar(10)    | NULL
+statut_soutenance    | varchar(30)    | DEFAULT 'planifiee'
+
+
+2.43 TABLE qualite_jury
+-----------------------
+Colonne             | Type           | Contrainte
+--------------------|----------------|-------------------------------------------
+id_qualite_jury     | varchar(2)     | PK
+lib_qualite_jury    | varchar(100)   | NOT NULL
+
+Qualités typiques : EN=Encadrant, EX=Examinateur, PJ=Président jury,
+                    DM=Directeur mémoire, MS=Maître de stage
+
+
+2.44 TABLE rapport_etudiants
+----------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_rapport           | int            | PK AUTO_INCREMENT
+num_etu              | varchar(25)    | FK → etudiants
+nom_rapport          | varchar(200)   | NOT NULL
+theme_rapport        | varchar(255)   | NULL
+contenu_rapport      | longtext       | NULL
+date_creation        | datetime       | DEFAULT CURRENT_TIMESTAMP
+date_modification    | datetime       | NULL
+statut               | varchar(30)    | DEFAULT 'brouillon'
+chemin_fichier       | varchar(255)   | NULL
+
+
+2.45 TABLE reclamations
+-----------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_reclamation       | int            | PK AUTO_INCREMENT
+num_etu              | varchar(25)    | FK → etudiants
+titre_reclamation    | varchar(200)   | NOT NULL
+description          | text           | NOT NULL
+date_soumission      | datetime       | DEFAULT CURRENT_TIMESTAMP
+id_type_reclamation  | int            | FK → type_reclamation
+id_statut_reclamation| int            | FK → statut_reclamation
+date_traitement      | datetime       | NULL
+commentaire_reponse  | text           | NULL
+id_pers_admin        | int            | FK → personnel_admin
+
+
+2.46 TABLE route_actions
+------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_route_action      | int            | PK AUTO_INCREMENT
+route_pattern        | varchar(255)   | NOT NULL
+http_method          | varchar(10)    | DEFAULT '*'
+action_crud          | varchar(20)    | DEFAULT 'voir'
+id_fonctionnalite    | int            | FK → fonctionnalites
+is_public            | tinyint(1)     | DEFAULT 0
+actif                | tinyint(1)     | DEFAULT 1
+
+Utilisée par RouteActionResolver pour le mapping dynamique des routes.
+
+
+2.47 TABLE salles
+-----------------
+Colonne         | Type           | Contrainte
+----------------|----------------|-------------------------------------------
+id_salle        | int            | PK AUTO_INCREMENT
+lib_salle       | varchar(50)    | NOT NULL
+capacite        | int            | NULL
+batiment        | varchar(50)    | NULL
+
+
+2.48 TABLE semestre
+-------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+id_semestre       | int            | PK AUTO_INCREMENT
+lib_semestre      | varchar(20)    | NOT NULL
+
+
+2.49 TABLE specialite
+---------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+id_specialite     | int            | PK AUTO_INCREMENT
+lib_specialite    | varchar(100)   | NOT NULL
+
+
+2.50 TABLE statut_reclamation
+-----------------------------
+Colonne                  | Type           | Contrainte
+-------------------------|----------------|-------------------------------------------
+id_statut_reclamation    | int            | PK AUTO_INCREMENT
+lib_statut_reclamation   | varchar(50)    | NOT NULL
+
+
+2.51 TABLE type_reclamation
+---------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_type_reclamation  | int            | PK AUTO_INCREMENT
+lib_type_reclamation | varchar(100)   | NOT NULL
+
+
+2.52 TABLE type_utilisateur
+---------------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_type_utilisateur  | int            | PK AUTO_INCREMENT
+lib_type_utilisateur | varchar(50)    | NOT NULL
+
+
+2.53 TABLE utilisateur
+----------------------
+Colonne              | Type           | Contrainte
+---------------------|----------------|-------------------------------------------
+id_utilisateur       | int            | PK AUTO_INCREMENT
+login_utilisateur    | varchar(100)   | NOT NULL (FK vers 3 tables)
+mdp_utilisateur      | varchar(255)   | NOT NULL
+nom_utilisateur      | varchar(50)    | NULL
+prenom_utilisateur   | varchar(100)   | NULL
+statut_utilisateur   | varchar(20)    | DEFAULT 'actif'
+id_GU                | int            | FK → groupe_utilisateur
+id_type_utilisateur  | int            | FK → type_utilisateur
+date_creation        | datetime       | DEFAULT CURRENT_TIMESTAMP
+
+Foreign Keys :
+- FK utilisateur.etudiants via login_utilisateur → etudiants.num_ident_etud
+- FK utilisateur.enseignants via login_utilisateur → enseignants.mail_enseignant
+- FK utilisateur.personnel_admin via login_utilisateur → personnel_admin.email_pers_admin
+
+
+2.54 TABLE valider
+------------------
+Colonne           | Type           | Contrainte
+------------------|----------------|-------------------------------------------
+id_decision       | int            | FK → decisions_jury
+num_soutenance    | varchar(20)    | PK (composite)
+id_pers_admin     | int            | FK → personnel_admin
+date_validation   | datetime       | NULL
+
+
+2.55 AUTRES TABLES (audit complet)
+----------------------------------
+- juger          : relation jury → soutenance
+- jury           : composantes du jury
+- statut_jury    : statuts du jury
+
+
+3. ALIGNEMENT CODE ↔ BASE DE DONNÉES
+====================================
+
+3.1 Correspondance Controllers → Tables
+---------------------------------------
+
+Controller                     | Tables utilisées
+-------------------------------|------------------------------------------
+AuthController                 | utilisateur, groupe_utilisateur,
+                               | type_utilisateur, enseignants, etudiants,
+                               | personnel_admin, auth_rate_limits, audit_log
+CandidatureSoutenanceController| candidature_soutenance, informations_stage,
+                               | entreprises, maitre_de_stage, compte_rendu
+GestionRapportController       | rapport_etudiants, deposer, evaluations_rapports,
+                               | etudiants, informations_stage, entreprises,
+                               | approuver
+GestionReclamationsController  | reclamations, type_reclamation,
+                               | statut_reclamation
+GestionUtilisateurController   | utilisateur, groupe_utilisateur,
+                               | type_utilisateur, etudiants, enseignants,
+                               | personnel_admin
+NotesResultatsController       | notes, etudiants, annee_academique,
+                               | bareme_critere, evaluer, critere_evaluation
+GestionScolariteController     | inscriptions, etudiants, annee_academique,
+                               | niveau_etude, mode_paiement, frais_inscription
+GestionRhController            | enseignants, personnel_admin, avoir, grade,
+                               | specialite, fonction, etablissement_origine
+PlanificationSoutenanceController| programmer_soutenance, salles,
+                               | etudiants, enseignant_jury, qualite_jury
+EvaluationSoutenanceController | evaluer, critere_evaluation, bareme_critere,
+                               | enseignant_jury, programmer_soutenance
+RedactionCompteRenduController  | compte_rendu, compte_rendu_rapport,
+                               | rapport_etudiants
+ArchiveController              | (lecture multi-tables pour archivage)
+ParametreController            | categories_fonctionnalites, fonctionnalites,
+                               | app_settings, annee_academique
+InscriptionController          | inscriptions, etudiants, niveau_etude,
+                               | annee_academique, mode_paiement
+DashboardController            | (agrégation multi-tables)
+DossierAcademiqueController    | notes, etudiants, inscriptions,
+                               | annee_academique
+SauvegardeRestaurationController| (dump/restauration de toute la base)
+AuditController                | audit_log
+MenuController                 | fonctionnalites, categories_fonctionnalites,
+                               | permissions, route_actions
+
+
+3.2 Tables en base NON utilisées par le code
+--------------------------------------------
+
+Les tables suivantes existent dans la base mais ne sont pas directement
+utilisées par les contrôleurs/services (usage limité ou legacy) :
+- action           (référencée dans audit_log mais pas d'usage direct)
+- domaine          (référencée dans des anciens formulaires)
+- document         (stockage de documents, usage limité)
+- messages         (système de messages, pas d'interface active)
+- niveau_acces_donnees (référence pour niveaux d'accès)
+- niveau_approbation   (référence pour niveaux d'approbation)
+
+
+3.3 Tables référencées dans le code mais NON dans audit.txt
+-----------------------------------------------------------
+
+Certaines tables référencées dans le code peuvent avoir été ajoutées
+après l'audit initial :
+- audit_log              (journal d'audit, créée par le système)
+- approuver              (validation des rapports)
+- statut_jury            (statuts des jurys)
+- juger                  (relation jury ↔ décision)
+
+Note : L'audit du 14/03/2026 est complet et ces tables sont incluses.
+
+
+3.4 Vérification d'intégrité des Foreign Keys
+---------------------------------------------
+
+FK utilisateur.login_utilisateur :
+  → etudiants.num_ident_etud (ON DELETE CASCADE ON UPDATE CASCADE)
+  → enseignants.mail_enseignant (ON DELETE CASCADE ON UPDATE CASCADE)
+  → personnel_admin.email_pers_admin (ON DELETE CASCADE ON UPDATE CASCADE)
+
+Ces FK sont gérées par la procédure stockée add_user_fk qui vérifie
+l'existence avant de les créer.
+
+
+3.5 Variations de schéma gérées dans le code
+---------------------------------------------
+
+Nom table alternatif :
+- enseignant_jury = composer_jury (nom ancien encore utilisé dans
+  certaines parties du code)
+
+Noms de colonnes avec variations :
+- informations_stage.id_maitre_stage ↔ maitre_de_stage.id_maitre_stage
+- Note : La table maitre_de_stage a des colonnes avec casse mixte :
+  'Nom' (majuscule) vs 'prenom' (minuscule)
+
+Patterns de requêtes avec alias :
+- rapport_etudiants peut être appelé rapports dans certaines requêtes
+- candidature_soutenance peut être appelé candidatures
+
+
+3.6 Clés composites — Correspondance
+------------------------------------
+
+Clé composite                 | Tables code            | Conforme DB?
+------------------------------|------------------------|-------------
+(affecter) enseignant+rapport | GestionRapportService  | Oui
+(avoir) grade+enseignant      | GestionRhService       | Oui
+(bareme_critere) annee+critere| EvaluationSoutenanceService | Oui
+(deposer) etu+rapport         | GestionRapportService  | Oui
+(compte_rendu_rapport) CR+rapport| RedactionCompteRenduService | Oui
+(evaluer) etu+jury+critere    | EvaluationSoutenanceService | Oui
+(frais_inscription) niv+annee | ParametreService       | Oui
+(inscriptions) carte+annee+vers| InscriptionService    | Oui
+(enseignant_jury) sout+ens+qual| PlanificationSoutenanceService | Oui
+
+
+================================================================================
+  FIN DE LA DOCUMENTATION BASE DE DONNÉES ET ALIGNEMENT
+================================================================================

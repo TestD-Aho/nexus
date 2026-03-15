@@ -1,0 +1,161 @@
+# PRD-08 - Refonte des workflows metier (candidature -> rapport -> commission -> soutenance)
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-02, PRD-03, PRD-04, PRD-05, PRD-06, PRD-07
+- Composants utilises: `nesbot/carbon`, `respect/validation`, `symfony/string`
+
+## Resume executif
+Ce PRD refactorise le coeur metier de CheckMaster en use-cases explicites et services specialises, tout en conservant les parcours actuels documentes dans `docs3\04..10`.
+
+## Objectifs
+1. Decouper les services metier volumineux.
+2. Definir des state machines explicites pour chaque workflow.
+3. Renforcer la coherence entre domaines (etudiant, rapport, commission, soutenance).
+4. Garantir la non-regression fonctionnelle complete.
+
+## Contraintes non negociables
+1. Aucun changement schema BDD.
+2. Etats metiers existants conserves (avec normalisation backend).
+3. Transactions explicites sur etapes critiques.
+4. Pas de changement du design et des parcours front.
+
+## Workflows cibles
+1. Candidature soutenance
+2. Redaction/depot rapport
+3. Verification/validation commission
+4. Programmation soutenance
+5. Evaluation jury et decision finale
+6. Generation documents metier
+
+## Services metier cibles
+- `CandidatureWorkflowService`
+- `RapportWorkflowService`
+- `CommissionWorkflowService`
+- `SoutenancePlanningWorkflowService`
+- `SoutenanceEvaluationWorkflowService`
+- `WorkflowAuditService`
+
+## State machines (exemple)
+### Rapport
+- `brouillon` -> `depose` -> `en_evaluation` -> `valide` ou `rejete`
+
+### Candidature
+- `en_attente` -> `validee` ou `rejetee`
+
+### Soutenance
+- `planifiee` -> `en_cours` -> `cloturee`
+
+> Toutes les transitions doivent etre validees par regles metier + permissions.
+
+## Exigences fonctionnelles (FR)
+- FR-08-01: chaque transition est une methode metier explicite.
+- FR-08-02: impossibilite de transition invalide.
+- FR-08-03: historique des transitions disponible.
+- FR-08-04: orchestration centralisee des validations metier.
+- FR-08-05: maintien des points d'entree existants.
+
+## Exigences techniques (NFR)
+- NFR-08-01: logique temporelle via Carbon (delais, fenetres, dates limites).
+- NFR-08-02: validation input via ValidationEngine.
+- NFR-08-03: transactions repository sur transitions critiques.
+- NFR-08-04: audit complet de toute transition.
+
+## Tables concernees
+- `candidature_soutenance`
+- `informations_stage`
+- `rapport_etudiants`, `deposer`
+- `valider`, `evaluations_rapports`, `evaluer`, `notes`
+- `programmer_soutenance`, `enseignant_jury`
+- `document_genere`, `pister`
+
+## Modules impactes
+- Controllers:
+  - `CandidatureSoutenanceController`
+  - `GestionRapportController`
+  - `VerificationRapportsController`
+  - `EvaluationDossiersController`
+  - `ProgrammationSoutenanceController`
+  - `EvaluationSoutenanceController`
+- Services hotspots:
+  - `GestionRapportService`
+  - `EvaluationSoutenanceService`
+  - `ProgrammationSoutenanceService`
+  - `ProcessusValidationService`
+
+## Plan d'implementation
+1. Cartographier transitions existantes par domaine.
+2. Introduire state machine abstraite + policies de transition.
+3. Migrer workflow rapport/candidature.
+4. Migrer workflow commission/soutenance.
+5. Connecter generation documents et audit global.
+
+## Strategie de test
+- Tests unitaires par transition.
+- Tests integration end-to-end par parcours:
+  - etudiant: candidature -> depot rapport
+  - commission: evaluation -> decision
+  - soutenance: programmation -> notation -> cloture
+- Tests de permissions sur transitions.
+
+## Criteres d'acceptation
+- Transitions metier centralisees et testees.
+- Aucun parcours fonctionnel casse.
+- Historique de transition disponible.
+- Schema BDD strictement inchange.
+
+## Risques et mitigations
+- Risque: divergences statuts legacy/cible.  
+  Mitigation: table de mapping statut et adaptateur temporaire.
+- Risque: couplage inter-domaines.  
+  Mitigation: orchestrateurs dedies + interfaces claires.
+- Risque: complexite migration progressive.  
+  Mitigation: rollout par domaine et checkpoints de regression.
+
+## Definition of done
+- Workflows metier principaux migrés vers services dedies.
+- State machines operationnelles et auditees.
+- Documentation des transitions livree.
+
+## Annexe detaillee H - matrice complete de transitions metier
+
+### Workflow candidature
+| Etat source | Action | Etat cible | Acteur | Validation |
+|---|---|---|---|---|
+| en_attente | valider | validee | commission/scolarite | dossier complet |
+| en_attente | rejeter | rejetee | commission/scolarite | motif obligatoire |
+
+### Workflow rapport
+| Etat source | Action | Etat cible | Acteur | Validation |
+|---|---|---|---|---|
+| brouillon | deposer | depose | etudiant | contenu non vide |
+| depose | ouvrir_evaluation | en_evaluation | commission | rapport admissible |
+| en_evaluation | valider | valide | commission | quorum/decision conforme |
+| en_evaluation | rejeter | rejete | commission | motif trace |
+
+### Workflow soutenance
+| Etat source | Action | Etat cible | Acteur | Validation |
+|---|---|---|---|---|
+| planifiee | demarrer | en_cours | admin/commission | jury+salle confirms |
+| en_cours | cloturer | cloturee | jury/commission | notes et decision saisies |
+
+### Frontieres transactionnelles et compensations
+- Si transition et ecriture audit echouent: rollback transition.
+- Si generation document echoue apres transition: conserver transition, creer tache de regeneration.
+- Si notification echoue: ne pas annuler transition, journaliser incident.
+
+### Catalogue d'evenements metier
+- `CandidatureSubmitted`
+- `RapportDeposited`
+- `RapportStatusChanged`
+- `CommissionDecisionRecorded`
+- `SoutenanceScheduled`
+- `SoutenanceClosed`
+
+### Checklist workflow
+- [ ] Transition invalide impossible.
+- [ ] Chaque transition auditee.
+- [ ] Permissions verifiees avant transition.
+- [ ] Rollback transactionnel defini.
+- [ ] Schema BDD inchange.

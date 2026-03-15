@@ -1,0 +1,813 @@
+================================================================================
+INVENTAIRE DES UTILS ET CONFIG - CHECKMASTER UFRMI
+================================================================================
+Document: 12_utils_config_inventory.txt
+Version: 1.0
+Date: 2026-03-14
+Description: Inventaire complet de tous les utilitaires et fichiers de
+             configuration du systeme.
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+  PARTIE A: UTILITAIRES (14 fichiers)
+    A.1 permissions_helper.php
+    A.2 ComponentHelper.php
+    A.3 EmailService.php
+    A.4 ExcelImportService.php
+    A.5 AcademicYear.php
+    A.6 FormattingUtils.php
+    A.7 ReceiptUtils.php
+    A.8 PaginationHelper.php
+    A.9 NavigationHelper.php
+    A.10 FormHelper.php
+    A.11 RecuDataUtils.php
+    A.12 PlanningDataUtils.php
+    A.13 FormFieldStandards.php
+    A.14 TableHelper.php
+
+  PARTIE B: CONFIGURATION (4 fichiers)
+    B.1 database.php
+    B.2 permission_registry.php
+    B.3 email_templates.php
+    B.4 email.php
+
+  ANNEXE: TABLE app_settings
+
+
+================================================================================
+PARTIE A: UTILITAIRES
+================================================================================
+
+--------------------------------------------------------------------------------
+A.1 permissions_helper.php (180 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/permissions_helper.php
+Description: Helpers de compatibilite pour les permissions.
+             Toute la decision runtime est centralisee dans AuthorizationService.
+
+Dependances:
+  - AuthorizationService (app/Security/AuthorizationService.php)
+  - PermissionContextFactory (app/Security/PermissionContextFactory.php)
+  - PermissionRegistry (app/Security/PermissionRegistry.php)
+  - Database (config/database.php)
+
+Fonctions globales exposees:
+
+  cm_authorization_service(): AuthorizationService
+    - Singleton de l'AuthorizationService
+    - Connexion DB automatique via Database::getConnection()
+
+  cm_permission_context_factory(): PermissionContextFactory
+    - Singleton du PermissionContextFactory
+    - Cree les contextes de permission
+
+  cm_current_permission_identifier(): string
+    - Resout l'identifiant de permission pour la requete courante
+    - Cherche slug_permission dans GET/POST
+    - Fallback sur $_GET['page']
+
+  canView($feature): bool
+    - Verification de permission de lecture
+    - Delegue a AuthorizationService::canView()
+
+  canCreate($feature): bool
+    - Verification de permission de creation
+
+  canEdit($feature): bool
+    - Verification de permission de modification
+
+  canDelete($feature): bool
+    - Verification de permission de suppression
+
+  isAdmin(): bool
+    - Verification si l'utilisateur courant est administrateur
+    - Verifie le type_utilisateur ou le groupe
+
+Pattern d'utilisation dans les vues:
+  <?php if (canView('gestion_etudiants')): ?>
+    <!-- Contenu visible si permission de vue -->
+  <?php endif; ?>
+
+  <?php if (canCreate('gestion_etudiants')): ?>
+    <button>Creer</button>
+  <?php endif; ?>
+
+--------------------------------------------------------------------------------
+A.2 ComponentHelper.php (2145 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/ComponentHelper.php
+Description: Rendu centralise pour les composants UI reutilisables.
+             Fournit des helpers proceduraux globaux pour la couche vue legacy.
+
+Dependances:
+  - ressources/components/ (repertoire des composants)
+
+Classe principale: ComponentHelper
+
+  Constructeur: __construct(?string $basePath = null)
+    - basePath: repertoire des composants
+    - Defaut: ressources/components/
+
+  render(string $path, array $params = []): string
+    - Rend un composant et retourne le HTML
+    - Protection directory traversal (verification '..')
+    - Extract des parametres dans le scope du composant
+    - Output buffering pour capturer le rendu
+
+Fonctions globales exposees:
+
+  cm_component(string $name, array $props = []): void
+    - Include un composant reutilisable depuis ressources/components
+    - Version sans retour (echo direct)
+
+  cm_render_component(string $name, array $props = []): string
+    - Rend un composant et retourne le HTML
+    - Version avec retour (pour stockage ou traitement)
+
+  cm_asset(string $path): string
+    - Genere l'URL d'un asset (CSS, JS, image)
+    - Utilise le basePath configure
+
+  cm_render_param_crud_view(array $config): void
+    - Fonction massive de rendu d'ecran CRUD
+    - Genere automatiquement:
+      * Formulaire de creation/modification
+      * Tableau de liste avec pagination
+      * Actions (voir, modifier, supprimer)
+      * Filtres et recherche
+      * Messages flash
+    - Configuration via array:
+      [
+        'title' => 'Titre de la page',
+        'model_class' => 'NomDuModel',
+        'fields' => [...],          // Champs du formulaire
+        'columns' => [...],         // Colonnes du tableau
+        'filters' => [...],         // Filtres disponibles
+        'actions' => [...],         // Actions par ligne
+      ]
+
+  cm_toolbar_filter_configs(array $filters): string
+    - Genere la barre d'outils de filtrage
+    - Support: select, input, date range, checkbox
+
+Composants disponibles dans ressources/components/:
+  - forms/ (champs de formulaire)
+  - tables/ (tableaux de donnees)
+  - modals/ (boites de dialogue)
+  - alerts/ (messages flash)
+  - navigation/ (menus, breadcrumbs)
+  - cards/ (cartes d'affichage)
+
+--------------------------------------------------------------------------------
+A.3 EmailService.php (225 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/EmailService.php
+Description: Service d'envoi d'emails via PHPMailer SMTP.
+
+Dependances:
+  - PHPMailer (vendor/phpmailer/)
+  - config/email.php (configuration SMTP)
+  - app_settings table (override DB)
+
+Classe: EmailService
+
+  Constructeur: __construct()
+    - Cree une instance PHPMailer
+    - Configure automatiquement via configureMailer()
+
+  configureMailer(): void
+    - Charge config depuis config/email.php
+    - Override depuis table app_settings si disponible
+    - SMTP configuration:
+      * Host: smtp.gmail.com (defaut)
+      * Port: 587
+      * Encryption: STARTTLS
+      * Auth: active
+    - Expéditeur: checkmaster.ci@gmail.com
+
+  sendEmail($to, $subject, $message, $isHTML = false): bool
+    - Envoi d'un email simple
+    - Parametres:
+      * $to: adresse email destinataire
+      * $subject: sujet de l'email
+      * $message: corps du message
+      * $isHTML: format HTML (defaut: false)
+    - Retourne: true si succes, false si echec
+    - Protection: clearAddresses() et clearAttachments() avant envoi
+
+  sendEmailWithAttachment($to, $subject, $message, $attachmentPath, $attachmentName = null): bool
+    - Envoi d'un email avec piece jointe
+    - Parametres supplementaires:
+      * $attachmentPath: chemin vers le fichier
+      * $attachmentName: nom affiche (optionnel)
+
+  sendTemplate($to, $templateKey, $variables = []): bool
+    - Envoi d'un email depuis un template
+    - Templates definis dans email_templates.php
+    - Remplacement des variables {{variable}} dans le template
+    - Templates disponibles:
+      * USER_WELCOME: Bienvenue nouvel utilisateur
+      * CANDIDATURE_RESULT: Resultat de candidature
+      * REPORT_NOTIFICATION: Notification rapport
+
+  sendResultEmail($etudiantEmail, $resultData): bool
+    - Envoi specifique pour les resultats de candidature
+    - Formatage automatique des donnees de resultat
+
+Gestion des erreurs:
+  - Les exceptions PHPMailer sont capturees
+  - Les erreurs sont logguees (sans exposer les secrets)
+  - Ne bloque jamais le flux principal (fail-safe)
+
+--------------------------------------------------------------------------------
+A.4 ExcelImportService.php (550 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/ExcelImportService.php
+Description: Service d'import CSV pour les archives etudiants.
+
+Dependances:
+  - Database (connexion PDO)
+  - Models: Etudiant, Enseignant, etc.
+
+Classe: ExcelImportService
+
+  Mapping des colonnes CSV (20 colonnes):
+    Colonne 0: matricule
+    Colonne 1: nom
+    Colonne 2: prenom
+    Colonne 3: date_naissance
+    Colonne 4: lieu_naissance
+    Colonne 5: sexe
+    Colonne 6: nationalite
+    Colonne 7: email
+    Colonne 8: telephone
+    Colonne 9: adresse
+    Colonne 10: niveau_etude
+    Colonne 11: filiere
+    Colonne 12: annee_academique
+    Colonne 13: mention
+    Colonne 14: decision
+    Colonne 15: date_deliberation
+    Colonne 16: entreprise_stage
+    Colonne 17: sujet_memoire
+    Colonne 18: nom_encadrant
+    Colonne 19: observations
+
+  processRow(array $row, int $lineNumber): array
+    - Traitement d'une ligne CSV
+    - Validation des donnees
+    - Creation/mise a jour de l'etudiant
+    - Creation/mise a jour des entites liees
+    - Retourne: ['success' => bool, 'message' => string, 'errors' => array]
+
+  getOrCreateEntreprise(string $nom): int
+    - Cherche l'entreprise par nom
+    - Cree si inexistante
+    - Retourne: id_entreprise
+
+  getOrCreateEnseignant(string $nomComplet): int
+    - Cherche l'enseignant par nom complet
+    - Cree si inexistant
+    - Note: recherche par nom seulement (pas de verification doublon prenom)
+
+  importArchiveFile(string $filePath, array $options = []): array
+    - Import complet d'un fichier CSV
+    - Traitement ligne par ligne
+    - Statistiques: total, succes, erreurs, doublons
+    - Rollback en cas d'erreur critique
+
+--------------------------------------------------------------------------------
+A.5 AcademicYear.php (400 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/AcademicYear.php
+Description: Gestion des annees academiques avec session-based year selection
+             et write-gating.
+
+Classe: AcademicYear (statique)
+
+  Constantes:
+    - ALL_QUERY_VALUE: 'all'
+    - ALL_LABEL: 'Toutes les annees'
+
+  fetchAll(\PDO $db): array
+    - Recupere toutes les annees academiques
+    - Cache en memoire (static)
+    - Determine is_active selon date_deb et date_fin
+    - Format: [{id, label, date_deb, date_fin, is_active}, ...]
+
+  getActive(\PDO $db): ?array
+    - Recupere l'annee academique active (date courante entre deb et fin)
+    - Retourne null si aucune annee active
+
+  getSelectedIdFromSession(): ?int
+    - Recupere l'ID de l'annee selectionnee depuis $_SESSION['selected_year_id']
+    - Retourne null si non selectionnee
+
+  setSelectedIdToSession(int $yearId): void
+    - Enregistre l'ID de l'annee selectionnee en session
+    - $_SESSION['selected_year_id'] = $yearId
+
+  ensureWritableYear(\PDO $db, ?int $yearId, string $context): array
+    - Verifie que l'annee est writable (active ou selectionnee)
+    - Retourne: ['success' => bool, 'message' => string]
+    - Pattern de write-gating:
+      * Si $yearId est null => autorise (ecriture sur annee courante)
+      * Si $yearId == annee active => autorise
+      * Sinon => refuse avec message explicite
+
+  getById(\PDO $db, int $id): ?array
+    - Recupere une annee par son ID
+
+  formatLabel(string $start, string $end, string $id): string
+    - Formate le label d'affichage
+    - Exemple: "2025-2026" ou "Annee #{id}"
+
+Utilisation typique:
+  $selectedId = AcademicYear::getSelectedIdFromSession();
+  $guard = AcademicYear::ensureWritableYear($pdo, $selectedId, 'enregistrement');
+  if (!$guard['success']) {
+      throw new Exception($guard['message']);
+  }
+
+--------------------------------------------------------------------------------
+A.6 FormattingUtils.php (84 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/FormattingUtils.php
+Description: Utilitaires de formatage pour l'affichage.
+
+Fonctions:
+
+  formatMoney(float $amount): string
+    - Formate un montant en FCFA
+    - Exemple: 50000 -> "50 000 FCFA"
+    - Separateur: espace (norme francaise)
+
+  formatDecimal(float $value, int $decimals = 2): string
+    - Formate un decimal avec virgule francaise
+    - Exemple: 12.5 -> "12,50"
+
+  formatDate(string $date): string
+    - Formate une date en format francais
+    - Exemple: "2026-03-14" -> "14/03/2026"
+
+  sanitizeText(string $text): string
+    - Nettoie le texte pour l'affichage HTML
+    - Protection XSS basique
+
+  formatPercentage(float $value, int $decimals = 1): string
+    - Formate un pourcentage
+    - Exemple: 0.855 -> "85,5%"
+
+--------------------------------------------------------------------------------
+A.7 ReceiptUtils.php (147 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/Utils/ReceiptUtils.php
+Description: Utilitaires pour les recus de paiement.
+
+Namespace: App\Utils
+
+Fonctions:
+
+  numberToWords(int $number): string
+    - Convertit un nombre en mots francais
+    - Supporte jusqu'a 999 999 999
+    - Exemples:
+      * 0 -> "Zero"
+      * 50000 -> "Cinquante mille"
+      * 150000 -> "Cent cinquante mille"
+      * 25000 -> "Vingt-cinq mille"
+
+  calculerProchainVersement(array $versement, array $inscription): ?string
+    - Calcule la date du prochain versement
+    - Base sur le nombre de versements effectues
+    - Supporte: 3 ou 4 versements (trimestriel ou quadrimestriel)
+
+  genererNumeroRecu(int $versementId): string
+    - Genere le numero de recu
+    - Format: R + zero-padded (5 chiffres)
+    - Exemple: R00042
+
+--------------------------------------------------------------------------------
+A.8 PaginationHelper.php (53 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/PaginationHelper.php
+Description: Helper de pagination pour les tableaux de donnees.
+
+Fonction:
+
+  cm_paginate(int $total, int $page, int $perPage): array
+    - Calcule les metadonnees de pagination
+    - Retourne:
+      [
+        'total' => int,
+        'page' => int,
+        'per_page' => int,
+        'total_pages' => int,
+        'has_prev' => bool,
+        'has_next' => bool,
+        'offset' => int,
+        'limit' => int,
+        'pages' => array,  // Liste des numeros de page
+      ]
+    - Pagination par defaut: 20 elements par page
+
+--------------------------------------------------------------------------------
+A.9 NavigationHelper.php (118 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/NavigationHelper.php
+Description: Helpers de navigation pour les vues.
+
+Fonctions:
+
+  buildMenu(array $items, string $currentRoute): string
+    - Genere le HTML du menu principal
+    - Marque l'item actif selon $currentRoute
+    - Supporte les sous-menus hierarchiques
+
+  buildBreadcrumb(array $items): string
+    - Genere le fil d'Ariane
+    - Format: Accueil > Section > Sous-section > Page
+
+  buildTabs(array $tabs, string $activeTab): string
+    - Genere les onglets de navigation
+    - Marque l'onglet actif
+
+  buildSteps(array $steps, int $currentStep): string
+    - Genere les etapes d'un processus (wizard)
+    - Affichage: [1] > [2] > [3] > [4]
+    - Etape courante mise en evidence
+
+--------------------------------------------------------------------------------
+A.10 FormHelper.php (229 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/FormHelper.php
+Description: Helpers pour les formulaires (CSRF, erreurs, champs).
+
+Fonctions:
+
+  cm_csrf_token(): string
+    - Genere un token CSRF pour le formulaire
+    - Stocke en session
+    - A inclure dans chaque formulaire
+
+  cm_csrf_verify(string $token): bool
+    - Verifie un token CSRF
+    - Compare avec le token en session
+
+  cm_old(string $field, string $default = ''): string
+    - Recupere l'ancienne valeur d'un champ (apres erreur)
+    - Permet de re-remplir le formulaire
+
+  cm_error(string $field): string
+    - Recupere le message d'erreur pour un champ
+    - Affiche en rouge sous le champ
+
+  fieldConfig(string $type, string $label, array $options = []): array
+    - Genere une configuration de champ standardisee
+    - Types: text, email, password, date, select, textarea, file, checkbox
+    - Options: required, placeholder, default, validation
+
+--------------------------------------------------------------------------------
+A.11 RecuDataUtils.php (219 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/RecuDataUtils.php
+Description: Extraction des donnees pour les recus de paiement.
+
+Namespace: App\Utils
+
+Methodes:
+
+  findVersementById(string|int $id): ?array
+    - Cherche un versement par ID (simple ou composite)
+    - Supporte les IDs composites (num_carte_etud + num_versement)
+
+  findInscriptionById(string $id): ?array
+    - Cherche une inscription par ID
+    - Jointure avec etudiants, annee_academique
+
+  parseCompositeId(string $compositeId): array
+    - Parse un ID composite
+    - Format: "num_carte_etud-num_versement"
+    - Retourne: ['num_carte_etud' => string, 'num_versement' => int]
+
+  getVersementData(string|int $versementId): ?array
+    - Recupere toutes les donnees necessaires pour un recu
+    - Jointure: versements, inscriptions, etudiants, annee_academique
+
+--------------------------------------------------------------------------------
+A.12 PlanningDataUtils.php (615 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/PlanningDataUtils.php
+Description: Extraction des donnees pour les plannings et PV.
+
+Namespace: App\Utils
+
+Methodes principales:
+
+  getSoutenancesForPlanning(?int $sessionId, ?string $dateFrom, ?string $dateTo): array
+    - Recupere les soutenances pour le planning
+    - Filtres: session, plage de dates
+    - Jointure: programmer_soutenance, etudiants, enseignant_jury, salles
+
+  getJuryDetails(string $soutenanceId): array
+    - Recupere les details du jury d'une soutenance
+    - Jointure: enseignant_jury, enseignants, qualite_jury
+    - Retourne: [{nom, prenom, role, qualite}, ...]
+
+  getSoutenanceWithFullDetails(string $soutenanceId): ?array
+    - Recupere une soutenance avec toutes les infos
+    - Jointure: etudiant, jury, salle, date, heure
+
+  getPvDataForSoutenance(string $soutenanceId): ?array
+    - Recupere les donnees pour le PV final
+    - Jointure: evaluations, notes, jury, decision
+
+  getCompteRenduById(int $compteRenduId): ?array
+    - Recupere un compte rendu par ID
+    - Jointure: rapports, etudiants, affectations
+
+--------------------------------------------------------------------------------
+A.13 FormFieldStandards.php (131 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/FormFieldStandards.php
+Description: Configurations standardisees pour les champs de formulaire.
+
+Fields standardises:
+  - date: type=date, pattern dd/mm/yyyy
+  - email: type=email, validation format
+  - nom: type=text, maxlength=100, pattern lettres
+  - prenom: type=text, maxlength=100
+  - montant: type=number, min=0, step=1000
+  - telephone: type=tel, pattern ivoirien
+  - matricule: type=text, uppercase, readonly si edition
+  - password: type=password, minlength=8
+  - select_generic: options dynamiques depuis DB
+
+Utilisation:
+  $config = FormFieldStandards::getConfig('email');
+  // Retourne: ['type' => 'email', 'label' => 'Email', 'required' => true, ...]
+
+--------------------------------------------------------------------------------
+A.14 TableHelper.php (110 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/TableHelper.php
+Description: Helpers pour la generation de tableaux HTML.
+
+Fonctions:
+
+  columnDefinitions(array $columns): array
+    - Genere les definitions de colonnes standardisees
+    - Chaque colonne: {key, label, sortable, width, render}
+
+  paginationData(int $total, int $page, int $perPage): array
+    - Alias de cm_paginate() pour usage dans les services
+
+  sortUrl(string $column, string $currentSort, string $currentDir): string
+    - Genere l'URL de tri pour une colonne
+    - Toggle asc/desc
+
+
+================================================================================
+PARTIE B: CONFIGURATION
+================================================================================
+
+--------------------------------------------------------------------------------
+B.1 database.php (36 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/config/database.php
+Description: Configuration de la connexion a la base de donnees.
+
+Classe: Database (statique)
+
+Parametres:
+  - host: 'localhost'
+  - db: 'ufrmi1802974_2q2mpf'
+  - user: 'root'
+  - pass: '' (vide - pas de mot de passe)
+  - charset: 'utf8'
+
+Methodes:
+  - getConfig(): array - Retourne la configuration
+  - getConnection(): PDO - Cree et retourne une connexion PDO
+    * PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    * DSN: mysql:host=localhost;dbname=ufrmi1802974_2q2mpf;charset=utf8
+
+Note de securite:
+  Les credentials sont hardcodes. En production, utiliser des variables
+  d'environnement ou un fichier .env non versionne.
+
+--------------------------------------------------------------------------------
+B.2 permission_registry.php (1056 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/config/permission_registry.php
+Description: Registre centralise des permissions et fonctionnalites.
+
+Groupes (9):
+  'administrateur'          => 5
+  'secretaire'              => 6
+  'charge_communication'    => 7
+  'responsable_scolarite'   => 8
+  'responsable_filiere'     => 9
+  'responsable_niveau'      => 10
+  'commission'              => 11
+  'enseignant'              => 12
+  'etudiant'                => 13
+
+Capacites (cap function):
+  - voir (view)
+  - creer (create)
+  - modifier (edit)
+  - supprimer (delete)
+
+Presets de capacites:
+  - $none:    [false, false, false, false]
+  - $view:    [true, false, false, false]
+  - $viewEdit:[true, false, true, false]
+  - $createEdit: [true, true, true, false]
+  - $full:    [true, true, true, true]
+
+Categories (categoryDefaults):
+  - ADMIN_PLATEFORME: administrateur -> full
+  - SCOLARITE: administrateur -> full, responsable_scolarite -> full
+  - ETUDIANT_ENV: administrateur -> full, etudiant -> view
+  - COMMISSION: administrateur -> full, commission -> full
+  - SOUTENANCE: administrateur -> full, commission -> full
+  - ENV_ENSEIGNANT: administrateur -> full, enseignant -> view
+  - PROFIL: tous les groupes -> viewEdit
+
+Fonctionnalites (50+ features):
+  Chaque fonctionnalite definit:
+    - slug: identifiant unique
+    - code: code majuscule
+    - label: libelle affiche
+    - category_code: categorie
+    - menu_url: URL du menu
+    - routes: routes autorisees
+    - permissions: overrides de capacites par groupe
+
+  Exemples de fonctionnalites:
+    - gestion_etudiants (slug: 'gestion-etudiants')
+    - gestion_utilisateurs
+    - gestion_notes
+    - gestion_rapports
+    - candidature_soutenance
+    - evaluation_soutenance
+    - programmation_soutenance
+    - planification_soutenance
+    - gestion_scolarite
+    - ...
+
+Fonctionnalites param CRUD (25+):
+  Chaque fonctionnalite param CRUD a:
+    - slug: 'param-{nom}'
+    - routes: ['/param/{nom}', '/api/param/{nom}']
+    - category_code: 'ADMIN_PLATEFORME'
+
+--------------------------------------------------------------------------------
+B.3 email_templates.php (213 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/config/email_templates.php
+Description: Templates HTML pour les emails.
+
+Retourne: array de templates
+
+Template LAYOUT (global):
+  - HTML5 compliant
+  - Styles inline pour compatibilite email clients
+  - Design responsive
+  - Couleurs: fond #f4f7f9, container blanc
+  - Header avec logo
+  - Footer avec annee et texte legal
+
+Templates disponibles:
+
+  USER_WELCOME:
+    Sujet: "Bienvenue sur CheckMaster UFRMI"
+    Variables: {{nom}}, {{prenom}}, {{login}}, {{password_temporaire}}
+    Contenu: Information de connexion, lien d'acces
+
+  CANDIDATURE_RESULT:
+    Sujet: "Resultat de votre candidature - Soutenance"
+    Variables: {{nom}}, {{prenom}}, {{statut}}, {{motif}}
+    Contenu: Decision de la commission, prochaines etapes
+
+  REPORT_NOTIFICATION:
+    Sujet: "Notification - Rapport de memoire"
+    Variables: {{nom}}, {{prenom}}, {{statut_rapport}}, {{commentaire}}
+    Contenu: Statut du rapport, commentaires evaluateurs
+
+  PASSWORD_RESET:
+    Sujet: "Reinitialisation de mot de passe"
+    Variables: {{nom}}, {{lien_reset}}, {{expiration}}
+    Contenu: Lien de reinitialisation, delai d'expiration
+
+  PLANNING_NOTIFICATION:
+    Sujet: "Planning de votre soutenance"
+    Variables: {{nom}}, {{date_soutenance}}, {{heure}}, {{salle}}, {{jury}}
+    Contenu: Details de la soutenance programmee
+
+--------------------------------------------------------------------------------
+B.4 email.php (56 lignes)
+--------------------------------------------------------------------------------
+
+Fichier: app/config/email.php
+Description: Configuration SMTP avec override DB.
+
+Configuration statique (defaut):
+  - smtp_host: smtp.gmail.com
+  - smtp_port: 587
+  - smtp_encryption: tls
+  - smtp_username: checkmaster.ci@gmail.com
+  - smtp_password: '' (vide - a fournir via app_settings)
+  - smtp_from_email: checkmaster.ci@gmail.com
+  - smtp_from_name: 'Check Master'
+
+Override DB:
+  - Requete: SELECT setting_key, setting_value FROM app_settings
+             WHERE setting_key LIKE 'smtp_%'
+  - Cles supportees:
+    * smtp_host -> $cfg['smtp']['host']
+    * smtp_port -> $cfg['smtp']['port']
+    * smtp_username -> $cfg['smtp']['username']
+    * smtp_password -> $cfg['smtp']['password']
+    * smtp_from_email -> $cfg['smtp']['from_email']
+    * smtp_from_name -> $cfg['smtp']['from_name']
+
+Fallback: Si la table app_settings n'existe pas ou DB indisponible,
+          utilise la configuration statique (sans mot de passe).
+
+
+================================================================================
+ANNEXE: TABLE app_settings
+================================================================================
+
+Table: app_settings
+Description: Parametres de configuration de l'application (key-value).
+
+Schema:
+  - id (PK)
+  - setting_key (varchar, unique): Cle du parametre
+  - setting_value (text): Valeur du parametre
+  - is_sensitive (boolean): Si true, ne pas logger la valeur
+  - description (varchar): Description du parametre
+  - updated_at (datetime): Derniere modification
+  - updated_by (FK): Utilisateur ayant modifie
+
+Parametres connus:
+  - smtp_host: Serveur SMTP
+  - smtp_port: Port SMTP
+  - smtp_username: Utilisateur SMTP
+  - smtp_password: Mot de passe SMTP (is_sensitive=1)
+  - smtp_from_email: Email expediteur
+  - smtp_from_name: Nom expediteur
+  - app_name: Nom de l'application
+  - logo_url: URL du logo principal
+  - logo_url2: URL du logo secondaire
+  - annee_academique_active: ID de l'annee academique active
+  - inscription_ouverte: Oui/Non
+
+
+================================================================================
+RESUME
+================================================================================
+
+┌──────────────────────────────────────────────────────────────────┐
+│                          UTILITAIRES                             │
+├──────────────────────────────────────────────────────────────────┤
+│ Nombre total:                     14 fichiers                    │
+│ Plus volumineux:                  ComponentHelper (2145 lignes)  │
+│ Plus complexe:                    PlanningDataUtils (615 lignes) │
+│ Helpers globaux exposes:          ~20 fonctions                  │
+├──────────────────────────────────────────────────────────────────┤
+│                          CONFIGURATION                           │
+├──────────────────────────────────────────────────────────────────┤
+│ Nombre total:                     4 fichiers                     │
+│ Plus volumineux:                  permission_registry (1056)     │
+│ Groupes utilisateurs:             9                              │
+│ Fonctionnalites:                  50+                            │
+│ Templates email:                  5                              │
+└──────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

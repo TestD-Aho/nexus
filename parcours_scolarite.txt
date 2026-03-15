@@ -1,0 +1,713 @@
+================================================================================
+  PARCOURS UTILISATEUR - SCOLARITÉ (GROUPE 8)
+  Documentation technique complète du flux utilisateur scolarité
+  Application CheckMaster - UFR MI / MIAGE - UFHB-CI
+================================================================================
+
+TABLE DES MATIÈRES
+==================
+1.  Connexion et authentification
+2.  Dashboard Scolarité (page=dashboard_scolarite)
+3.  Gestion Étudiants (page=gestion_etudiants)
+4.  Gestion Inscription et Paiements (page=gestion_scolarite)
+5.  Saisie des Moyennes (page=gestion_notes_evaluations)
+6.  Gestion Réclamations Scolarité (page=gestion_reclamations_scolarite)
+7.  Gestion Candidatures Dossiers (page=gestion_dossiers_candidatures)
+8.  Mise en ligne mémoire (page=mise_en_ligne_memoire)
+9.  Tables de la base de données
+10. Données de session et permissions
+11. Flux de données et interactions
+
+================================================================================
+1. CONNEXION ET AUTHENTIFICATION
+================================================================================
+
+Controller : AuthController
+Service    : CheckMaster\Services\AuthService
+
+Pour un responsable de scolarité (id_GU = 8) :
+
+  Flux identique au parcours enseignant, avec les différences suivantes :
+
+  1. AuthService::login() authentifie l'utilisateur.
+  
+  2. type_utilisateur = 'Personnel administratif' :
+     → Chargement des données personnel administratif via
+       PersAdmin::getPersAdminByLogin() :
+     
+     Variables de session spécifiques :
+     ┌─────────────────────────┬──────────────────────────────────────┐
+     │ Variable de session     │ Source                               │
+     ├─────────────────────────┼──────────────────────────────────────┤
+     │ id_GU                   │ utilisateurs.id_GU = 8               │
+     │ lib_GU                  │ 'Scolarité' ou libellé associé       │
+     │ telephone               │ personnel_admin.tel_pers_admin       │
+     │ poste                   │ personnel_admin.poste                │
+     │ date_embauche           │ personnel_admin.date_embauche        │
+     └─────────────────────────┴──────────────────────────────────────┘
+  
+  3. Audit : AuditLog::logConnexion(id_utilisateur, 'utilisateur', 'Succès')
+
+================================================================================
+2. DASHBOARD SCOLARITÉ (page=dashboard_scolarite)
+================================================================================
+
+Controller : DashboardScolariteController
+Service    : CheckMaster\Services\DashboardScolariteService
+Méthode    : getDashboardData()
+
+Description :
+  Tableau de bord principal pour le responsable de scolarité. Affiche les
+  statistiques clés : inscriptions, réclamations, paiements.
+
+Flux d'exécution :
+
+  DashboardScolariteController::getDashboardData()
+    │
+    └─ DashboardScolariteService::getDashboardData()
+         │
+         ├─ 1. Statistiques des étudiants inscrits
+         │   → Inscription::countInscriptions($selectedYearId)
+         │   → Compte le nombre total d'inscriptions actives
+         │   → Filtrage par année académique sélectionnée
+         │
+         ├─ 2. Nouvelles inscriptions (7 derniers jours)
+         │   → Inscription::countNouvellesInscriptions(7, $selectedYearId)
+         │   → Compte les inscriptions dont date_inscription >= NOW() - 7 jours
+         │
+         ├─ 3. Statistiques des réclamations (loadReclamationStats)
+         │   → Requête SQL sur la table reclamations :
+         │     SELECT COUNT(*) as total,
+         │            SUM(CASE WHEN statut='en attente' THEN 1 ELSE 0 END) as en_attente,
+         │            SUM(CASE WHEN statut='résolue' OR 'traitée' THEN 1 ELSE 0 END) as resolues,
+         │            SUM(CASE WHEN statut='rejeté(e)' THEN 1 ELSE 0 END) as rejetees
+         │     FROM reclamations
+         │
+         ├─ 4. Statistiques des paiements (loadPaiementStats)
+         │   → Scolarite::getEtudiantsInscrits($selectedYearId)
+         │   → Pour chaque étudiant inscrit :
+         │     - reste_a_payer <= 0 → paiement complet (compte dans 'complets')
+         │     - reste_a_payer > 0  → paiement partiel (compte dans 'partiels')
+         │   → Calcul des montants :
+         │     - montant_total_paiements = montant_percu + montant_attente
+         │     - montant_percu = somme des montants payés (complets)
+         │     - montant_attente = somme des restes à payer (partiels)
+         │
+         └─ 5. Données pour le graphique
+             → Inscription::getInscriptionsParNiveau($selectedYearId)
+             → Répartition des inscriptions par niveau d'étude
+
+Résultat retourné :
+  [
+    'stats' => [
+      'etudiants'                => nombre total inscrits,
+      'nouvelles_inscriptions'   => nouvelles inscriptions (7 jours),
+      'reclamations_en_attente'  => réclamations en attente,
+      'reclamations_resolues'    => réclamations résolues/traitées,
+      'reclamations_rejetees'    => réclamations rejetées,
+      'reclamations_total'       => total réclamations,
+      'paiements_complets'       => étudiants avec paiement complet,
+      'paiements_partiels'       => étudiants avec paiement partiel,
+      'montant_total_paiements'  => montant total attendu,
+      'montant_percu'            => montant perçu,
+      'montant_attente'          => montant en attente,
+    ],
+    'inscriptionsParNiveau' => [...]  // données graphique
+  ]
+
+Tables utilisées :
+  - inscriptions         : inscriptions académiques et paiements
+  - reclamations         : réclamations des étudiants
+  - niveau_etude         : niveaux d'étude (pour le graphique)
+  - annee_academique     : filtrage par année
+
+Gestion d'erreur :
+  - PDOException capturée et loguée
+  - Retour de données par défaut (stats à 0) en cas d'erreur
+  - Message d'erreur utilisateur : "Une erreur est survenue..."
+
+================================================================================
+3. GESTION ÉTUDIANTS (page=gestion_etudiants)
+================================================================================
+
+Controller : GestionEtudiantController
+Service    : CheckMaster\Services\GestionEtudiantService
+Méthodes   : index(), ajouterEtudiant(), modifierEtudiant(), supprimerEtudiants()
+
+3.1 Affichage de la liste (index)
+
+  GestionEtudiantController::index()
+    │
+    ├─ Récupération des paramètres GET :
+    │   - p : numéro de page (défaut: 1)
+    │   - limit : éléments par page (5, 10, 25, 50, 100; défaut: 10)
+    │   - search : terme de recherche
+    │   - num_etu : étudiant à modifier (pour édition)
+    │   - modalAction : 'edit' pour mode édition
+    │
+    ├─ Chargement des listes de référence :
+    │   → GestionEtudiantService::getNiveauxEtude()
+    │   → GestionEtudiantService::getAnneesAcademiques()
+    │
+    ├─ Chargement de la liste des étudiants :
+    │   → GestionEtudiantService::getAllEtudiants()
+    │   → GestionEtudiantService::filtrerEtudiants($liste, $searchTerm)
+    │   → GestionEtudiantService::paginer($liste, $page, $limit)
+    │
+    └─ Injection dans $GLOBALS :
+        $GLOBALS['listeEtudiants']       = étudiants paginés
+        $GLOBALS['allEtudiants']         = tous les étudiants (pour recherche JS)
+        $GLOBALS['etudiant_a_modifier']  = étudiant en mode édition
+        $GLOBALS['currentPage']          = page actuelle
+        $GLOBALS['totalPages']           = nombre total de pages
+        $GLOBALS['totalItems']           = nombre total d'étudiants
+        $GLOBALS['listeNiveaux']         = niveaux d'étude
+        $GLOBALS['listeAnneesAcad']      = années académiques
+
+Réponse AJAX pour édition inline :
+  Si requête AJAX avec modalAction=edit :
+    header('Content-Type: application/json')
+    echo json_encode([
+      'num_etu' => ...,
+      'nom_etu' => ...,
+      'prenom_etu' => ...,
+      'date_naiss_etu' => ...,
+      'id_genre' => ...,
+      'email_etu' => ...,
+      'promotion_etu' => ...
+    ])
+    exit
+
+3.2 Ajout d'un étudiant (submit_add_etudiant)
+
+Vérification de permission :
+  if (!canCreate('gestion_etudiants')) → 403 / access_denied
+
+Flux :
+  GestionEtudiantService::ajouterEtudiant($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation des champs obligatoires
+    │   → num_carte_etud, nom_etu, prenom_etu, date_naiss_etu, etc.
+    │
+    ├─ 2. Vérification d'unicité
+    │   → num_carte_etud ne doit pas exister dans la table etudiants
+    │   → num_ident_etud ne doit pas exister
+    │   → Message : "Ce numéro de carte existe déjà"
+    │
+    ├─ 3. Validation du format email
+    │
+    ├─ 4. INSERT INTO etudiants
+    │   → Champs : num_carte_etud, nom_etu, prenom_etu, date_naiss_etu,
+    │              id_genre, email_etu, promotion_etu, num_ident_etud
+    │
+    └─ 5. Audit : enregistrement de l'action dans audit_log
+
+3.3 Modification d'un étudiant (submit_modifier_etudiant)
+
+Vérification de permission :
+  if (!canEdit('gestion_etudiants')) → 403 / access_denied
+
+Flux :
+  GestionEtudiantService::modifierEtudiant($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation des données
+    │
+    ├─ 2. Vérification année académique (guard)
+    │   → Ne permet pas la modification si l'étudiant est dans une
+    │     autre année que celle sélectionnée
+    │
+    ├─ 3. UPDATE etudiants
+    │   → Mise à jour des champs modifiés
+    │
+    └─ 4. Audit : log de la modification
+
+3.4 Suppression d'étudiants (selected_ids)
+
+Vérification de permission :
+  if (!canDelete('gestion_etudiants')) → 403 / access_denied
+
+Flux :
+  GestionEtudiantService::supprimerEtudiants($selected_ids, $id_utilisateur)
+    │
+    ├─ 1. Validation des IDs sélectionnés
+    │
+    ├─ 2. Garde année académique
+    │   → Vérifie que tous les étudiants sont dans l'année sélectionnée
+    │
+    ├─ 3. DELETE FROM etudiants WHERE num_carte_etud IN (...)
+    │
+    └─ 4. Audit : log de la suppression
+
+Tables utilisées :
+  - etudiants            : données des étudiants
+  - niveau_etude         : niveaux d'étude (pour le formulaire)
+  - annee_academique     : années académiques (pour filtres)
+  - audit_log            : piste d'audit
+
+================================================================================
+4. GESTION INSCRIPTION ET PAIEMENTS (page=gestion_scolarite)
+================================================================================
+
+Controller : GestionScolariteController
+Service    : CheckMaster\Services\GestionScolariteService
+
+4.1 Affichage principal (index)
+
+  GestionScolariteController::index()
+    │
+    ├─ Chargement des listes de référence :
+    │   → GestionScolariteService::getReferenceLists()
+    │   → Retourne : listeNiveaux, listeAnnees, listeVersement,
+    │                etudiantsInscrits, etudiantsNonInscrits, etc.
+    │   → Injection dans $GLOBALS
+    │
+    ├─ Si num_etu fourni en GET :
+    │   → GestionScolariteService::getInfoEtudiant($num_etu)
+    │   → Récupère l'historique des paiements de l'étudiant
+    │
+    └─ Traitement POST selon action :
+        - enregistrerVersement
+        - enregistrerPaiement
+        - mettre_a_jour_versement
+        - upload_fiche
+
+4.2 Enregistrement d'un versement (enregistrerVersement)
+
+Vérification :
+  if (!canCreate('gestion_scolarite') && !canEdit('gestion_scolarite'))
+
+Flux :
+  GestionScolariteService::enregistrerVersement($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation de l'inscription existante
+    │   → Vérifie qu'une inscription existe pour cet étudiant
+    │   → Message d'erreur si non inscrit
+    │
+    ├─ 2. Validation du montant
+    │   → Le montant ne doit pas dépasser le reste à payer
+    │   → Message : "Le montant dépasse le reste à payer"
+    │
+    ├─ 3. INSERT INTO versement
+    │   → Champs : num_carte_etud, montant_versement, date_versement,
+    │              id_mode_paiement, reference_paiement
+    │
+    ├─ 4. Recalcul du solde
+    │   → Mise à jour de inscriptions.montant_paye
+    │   → Calcul de inscriptions.reste_a_payer
+    │
+    └─ 5. Retour avec montants mis à jour :
+        $result['data'] = [
+          'montantTotal'  => montant total des frais,
+          'montantPaye'   => total payé,
+          'resteAPayer'   => reste à payer
+        ]
+
+4.3 Nouvelle inscription avec premier paiement (enregistrerPaiement)
+
+Vérification :
+  if (!canCreate('gestion_scolarite') && !canEdit('gestion_scolarite'))
+
+Flux :
+  GestionScolariteService::enregistrerPaiement($_POST, $id_utilisateur)
+    │
+    ├─ 1. Création de l'inscription
+    │   → INSERT INTO inscriptions :
+    │     num_carte_etud, id_annee_acad, id_niv_etude, date_inscription,
+    │     montant_paye (premier versement)
+    │
+    ├─ 2. Validation contre les frais d'inscription
+    │   → Comparaison avec frais_inscription.montant pour le niveau
+    │   → Si montant_paye >= montant → statut payé
+    │   → Sinon → calcul du reste_a_payer
+    │
+    ├─ 3. Enregistrement du premier versement
+    │   → INSERT INTO versement
+    │
+    └─ 4. Retour avec refreshLists = true
+        → Force le rechargement des listes d'étudiants inscrits/non inscrits
+
+4.4 Paiement additionnel (mise à jour versement)
+
+Flux :
+  GestionScolariteService::mettreAJourVersement($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation du versement existant
+    │
+    ├─ 2. Mise à jour du montant
+    │   → UPDATE versement SET montant_versement = ?
+    │
+    └─ 3. Recalcul du solde
+        → Mise à jour montant_paye et reste_a_payer dans inscriptions
+
+4.5 Upload fiche inscription (upload_fiche)
+
+Vérification :
+  Réponse JSON pour AJAX
+  if (!canCreate(...) && !canEdit(...)) → 403 JSON
+
+Flux :
+  GestionScolariteService::uploadFicheInscription($_POST, $_FILES, $id_utilisateur)
+    │
+    ├─ 1. Validation du fichier PDF
+    │   → Vérifie le type MIME (application/pdf)
+    │   → Vérifie la taille
+    │
+    ├─ 2. Sauvegarde du fichier
+    │   → Chemin : ressources/uploads/fiches_inscription/
+    │   → Nom : fiche_{num_carte_etud}_{timestamp}.pdf
+    │
+    └─ 3. Mise à jour de la BD
+        → UPDATE inscriptions SET fiche_inscription = ?
+          WHERE num_carte_etud = ?
+
+Tables utilisées :
+  - inscriptions          : inscriptions académiques, montants, fiche PDF
+  - versement             : enregistrements de paiements
+  - frais_inscription     : montants des frais par niveau d'étude
+  - etudiants             : informations étudiants
+  - niveau_etude          : niveaux d'étude
+  - annee_academique      : années académiques
+  - mode_paiement         : modes de paiement (espèces, virement, etc.)
+
+================================================================================
+5. SAISIE DES MOYENNES (page=gestion_notes_evaluations)
+================================================================================
+
+Controller : NotesController
+Service    : CheckMaster\Services\NotesService
+
+5.1 Affichage du formulaire (index)
+
+  NotesController::index()
+    │
+    ├─ Si action = 'enregistrer_notes' → appelle enregistrerNotes()
+    │
+    └─ Sinon, chargement des données :
+        NotesService::getIndexData($_GET)
+          │
+          ├─ Récupération des niveaux d'étude
+          ├─ Récupération des années académiques
+          ├─ Si niveau sélectionné :
+          │   → Liste des étudiants dans ce niveau
+          │   → Si étudiant sélectionné : notes existantes (M1, M2)
+          │   → Calcul de la moyenne générale
+          │
+          └─ Injection dans $GLOBALS :
+              niveaux, anneesAcademiques, etudiants,
+              selectedNiveau, selectedAnneeAcad, niveau,
+              selectedStudent, studentNote, moyenneGenerale
+
+5.2 Enregistrement des notes (enregistrerNotes)
+
+Vérification de permission :
+  if (!canCreate('gestion_notes_evaluations') && !canEdit('gestion_notes_evaluations'))
+    → $_SESSION['error'] + redirection
+
+Flux POST (btn_enregistrer_notes) :
+  NotesController::enregistrerNotes()
+    │
+    ├─ 1. Récupération des paramètres
+    │   → student / student_picker : ID étudiant
+    │   → id_annee_acad : année académique
+    │   → moyenne_M1 : note module 1 (0-20)
+    │   → moyenne_M2 : note module 2 (0-20)
+    │
+    ├─ 2. Validation
+    │   → studentId requis
+    │   → anneeAcadId requis
+    │   → Validation des notes (floatval, pas de contrainte explicite 0-20
+    │     mais typiquement attendu)
+    │
+    ├─ 3. NotesService::enregistrerNotes($studentId, $anneeAcadId, $M1, $M2, $idUser)
+    │   │
+    │   ├─ INSERT INTO notes (ou UPDATE si existe déjà)
+    │   │   → num_carte_etud, id_annee_acad, moyenne_M1, moyenne_M2
+    │   │
+    │   └─ Audit : log de l'enregistrement
+    │
+    └─ 4. Redirection vers la page avec message succès/erreur
+
+5.3 API JSON pour notes par étudiant
+
+  NotesController::getNotesByEtudiant()
+    → Vérifie canView('gestion_notes_evaluations')
+    → GET student_id, annee_acad_id
+    → Retourne les notes en JSON
+
+Tables utilisées :
+  - notes                 : moyennes M1/M2 des étudiants
+  - etudiants             : informations étudiants
+  - niveau_etude          : niveaux d'étude
+  - inscriptions          : pour filtrer par année académique
+  - annee_academique      : années académiques
+
+================================================================================
+6. GESTION RÉCLAMATIONS SCOLARITÉ (page=gestion_reclamations_scolarite)
+================================================================================
+
+Controller : GestionReclamationsScolariteController
+Service    : CheckMaster\Services\GestionReclamationsScolariteService
+
+6.1 Affichage des réclamations (index)
+
+  GestionReclamationsScolariteController::index()
+    │
+    └─ GestionReclamationsScolariteService::getReclamationsPartitionnees()
+         │
+         ├─ Récupère les réclamations en cours (en attente, en traitement)
+         │   → statut_reclamation IN ('en attente', 'en cours')
+         │   → Triées par date de création décroissante
+         │
+         ├─ Récupère les réclamations traitées (résolues, rejetées)
+         │   → statut_reclamation IN ('résolue', 'traitée', 'rejeté', 'rejetée')
+         │   → Triées par date de traitement décroissante
+         │
+         └─ Injection dans $GLOBALS :
+             $GLOBALS['reclamationsEnCours']  = réclamations en attente/cours
+             $GLOBALS['reclamationsTraitees'] = réclamations résolues/rejetées
+
+6.2 Changement de statut (changerStatut)
+
+Vérification de permission :
+  if (!canEdit('gestion_reclamations_scolarite'))
+    → $_SESSION['error_message'] + redirection
+
+Flux POST (id en GET, nouveau_statut en POST) :
+  GestionReclamationsScolariteService::changerStatut($id, $nouveauStatut, $idUtilisateur)
+    │
+    ├─ 1. UPDATE reclamations
+    │   → SET statut_reclamation = :nouveau_statut,
+    │        date_traitement = NOW(),
+    │        id_traitant = :id_utilisateur
+    │   WHERE id_reclamation = :id
+    │
+    └─ 2. Audit
+        → Enregistrement du changement de statut dans audit_log
+        → Trace l'ID utilisateur, l'ancien et le nouveau statut
+
+Statuts possibles :
+  ┌────────────────────┬───────────────────────────────────────────────┐
+  │ Statut             │ Description                                   │
+  ├────────────────────┼───────────────────────────────────────────────┤
+  │ en attente         │ Réclamation déposée, non encore traitée       │
+  │ en cours           │ Réclamation en cours de traitement            │
+  │ résolue / traitée  │ Réclamation traitée avec succès               │
+  │ rejeté / rejetée   │ Réclamation rejetée                           │
+  └────────────────────┴───────────────────────────────────────────────┘
+
+Tables utilisées :
+  - reclamations         : réclamations des étudiants
+  - etudiants            : informations étudiants
+  - audit_log            : piste d'audit
+
+================================================================================
+7. GESTION CANDIDATURES DOSSIERS (page=gestion_dossiers_candidatures)
+================================================================================
+
+Controller : GestionDossiersCandidaturesController
+Service    : CheckMaster\Services\GestionDossiersCandidaturesService
+
+Description :
+  Cette page permet au personnel de scolarité de consulter les rapports
+  de candidature des étudiants et leur statut de validation par la commission.
+
+Fonctionnalités :
+  1. Vue des rapports approuvés et désapprouvés avec statistiques
+  2. Consultation des détails d'un rapport
+  3. Téléchargement du PDF du rapport
+  4. Informations sur l'étudiant, le statut et les commentaires
+
+Données affichées :
+  - Liste des rapports avec :
+    - Nom et prénom de l'étudiant
+    - Thème du rapport
+    - Statut de validation (validé/rejeté/en attente)
+    - Date de dépôt
+    - Commentaires de la commission
+  - Statistiques :
+    - Nombre total de rapports
+    - Nombre approuvés
+    - Nombre désapprouvés
+    - Taux d'approbation
+
+Tables utilisées :
+  - rapport_etudiants    : rapports de candidature
+  - etudiants            : informations étudiants
+  - valider              : décisions de validation
+  - approuver            : décisions d'approbation
+  - inscriptions         : année académique
+
+================================================================================
+8. MISE EN LIGNE MÉMOIRE (page=mise_en_ligne_memoire)
+================================================================================
+
+Controller : (via GestionScolariteController ou un contrôleur dédié)
+
+Description :
+  Permet l'upload du fichier PDF du mémoire de l'étudiant.
+
+Flux :
+  1. Sélection de l'étudiant (parmi ceux ayant une soutenance programmée)
+  2. Upload du fichier PDF
+  3. Validation du type MIME (application/pdf)
+  4. Validation de la taille (limite configurée)
+  5. Sauvegarde dans ressources/uploads/memoires/
+  6. Mise à jour de la BD (chemin_fichier dans programmer_soutenance
+     ou table dédiée)
+
+Tables utilisées :
+  - programmer_soutenance : lien avec la soutenance
+  - etudiants             : informations étudiant
+
+================================================================================
+9. TABLES DE LA BASE DE DONNÉES
+================================================================================
+
+┌─────────────────────────┬─────────────────────────────────────────────────┐
+│ Table                   │ Rôle dans le parcours scolarité                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ utilisateurs            │ Compte d'authentification, id_GU=8              │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ personnel_admin         │ Informations personnel administratif            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ etudiants               │ Étudiants (CRUD complet par la scolarité)       │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ inscriptions            │ Inscriptions académiques et montants payés      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ versement               │ Enregistrements de paiements individuels        │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ frais_inscription       │ Montants des frais d'inscription par niveau     │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_etude            │ Niveaux d'étude (Licence, Master, etc.)         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ annee_academique        │ Années académiques                              │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ notes                   │ Moyennes M1/M2 des étudiants                    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ reclamations            │ Réclamations des étudiants                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ rapport_etudiants       │ Rapports de candidature à la soutenance         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ valider                 │ Décisions de validation des rapports            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ approuver               │ Décisions d'approbation des rapports            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ programmer_soutenance   │ Programmation des soutenances (pour mémoire)    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ mode_paiement           │ Modes de paiement (espèces, virement, etc.)     │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ audit_log               │ Piste d'audit des actions scolarité             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ genre                   │ Genre (M/F) pour le formulaire étudiant         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ groupe_utilisateur      │ Groupe utilisateur (id=8 pour scolarité)        │
+└─────────────────────────┴─────────────────────────────────────────────────┘
+
+================================================================================
+10. DONNÉES DE SESSION ET PERMISSIONS
+================================================================================
+
+Variables de session pour la scolarité :
+
+┌───────────────────────────┬──────────────────────────────────────────────┐
+│ Variable                  │ Description                                  │
+├───────────────────────────┼──────────────────────────────────────────────┤
+│ id_utilisateur            │ ID de l'utilisateur connecté                 │
+│ nom_utilisateur           │ Nom d'affichage                              │
+│ login_utilisateur         │ Login                                        │
+│ id_GU                     │ 8 (Scolarité)                                │
+│ lib_GU                    │ Libellé du groupe 'Scolarité'                │
+│ type_utilisateur          │ 'Personnel administratif'                    │
+│ telephone                 │ Téléphone du personnel admin                 │
+│ poste                     │ Poste occupé                                 │
+│ date_embauche             │ Date d'embauche                              │
+│ niveau_acces              │ Niveau d'accès aux données                   │
+└───────────────────────────┴──────────────────────────────────────────────┘
+
+Permissions de la scolarité :
+
+┌──────────────────────────────────┬──────┬────────┬──────┬────────┐
+│ Page                             │ View │ Create │ Edit │ Delete │
+├──────────────────────────────────┼──────┼────────┼──────┼────────┤
+│ dashboard_scolarite              │ OUI  │ -      │ -    │ -      │
+│ gestion_etudiants                │ OUI  │ OUI    │ OUI  │ OUI    │
+│ gestion_scolarite                │ OUI  │ OUI    │ OUI  │ -      │
+│ gestion_notes_evaluations        │ OUI  │ OUI    │ OUI  │ -      │
+│ gestion_reclamations_scolarite   │ OUI  │ -      │ OUI  │ -      │
+│ gestion_dossiers_candidatures    │ OUI  │ -      │ -    │ -      │
+│ mise_en_ligne_memoire            │ OUI  │ OUI    │ -    │ -      │
+└──────────────────────────────────┴──────┴────────┴──────┴────────┘
+
+Vérifications effectuées :
+  - canCreate('gestion_etudiants')   → ajout d'un étudiant
+  - canEdit('gestion_etudiants')     → modification d'un étudiant
+  - canDelete('gestion_etudiants')   → suppression d'étudiants
+  - canCreate('gestion_scolarite')   → enregistrement paiement
+  - canEdit('gestion_scolarite')     → mise à jour paiement
+  - canCreate('gestion_notes_evaluations') → saisie de notes
+  - canEdit('gestion_notes_evaluations')   → modification de notes
+  - canEdit('gestion_reclamations_scolarite') → changement statut réclamation
+
+================================================================================
+11. FLUX DE DONNÉES ET INTERACTIONS
+================================================================================
+
+Principaux flux de données :
+
+1. Connexion → Dashboard :
+   AuthService::login() → session id_GU=8 →
+   DashboardScolariteController::getDashboardData() →
+   DashboardScolariteService::getDashboardData() →
+   Stats inscriptions + réclamations + paiements → Vue dashboard
+
+2. Dashboard → Gestion Étudiants :
+   Navigation → GestionEtudiantController::index() →
+   Chargement liste étudiants + pagination →
+   POST ajout/modification/suppression →
+   GestionEtudiantService (validation unicité, CRUD) →
+   Audit log → Rafraîchissement vue
+
+3. Gestion Étudiants → Inscriptions :
+   Navigation → GestionScolariteController::index() →
+   Chargement étudiants non inscrits/inscrits + niveaux + années →
+   POST enregistrerPaiement →
+   Validation frais → INSERT inscriptions + versement →
+   Recalcul solde → Rafraîchissement listes
+
+4. Inscriptions → Versements supplémentaires :
+   POST enregistrerVersement →
+   Validation inscription existante + montant →
+   INSERT versement → Recalcul solde → Affichage montants mis à jour
+
+5. Inscriptions → Upload fiche :
+   POST upload_fiche (AJAX) → Validation PDF →
+   Sauvegarde fichier → UPDATE inscriptions.fiche_inscription → JSON response
+
+6. Saisie des notes :
+   Navigation → NotesController::index() →
+   Chargement niveaux + étudiants →
+   POST btn_enregistrer_notes → Validation →
+   NotesService::enregistrerNotes() → INSERT/UPDATE notes →
+   Redirection avec message
+
+7. Gestion réclamations :
+   Navigation → GestionReclamationsScolariteController::index() →
+   Chargement réclamations partitionnées →
+   POST changerStatut → Validation permission →
+   UPDATE reclamations.statut_reclamation → Audit log → Redirection
+
+8. Consultation candidatures :
+   Navigation → GestionDossiersCandidaturesController →
+   Chargement rapports avec statut validation →
+   Consultation détails / Téléchargement PDF
+
+Gestion des erreurs :
+  - Toutes les erreurs PDO sont capturées et loguées dans error_log
+  - Les messages d'erreur sont affichés via $GLOBALS['messageErreur']
+  - Les succès sont affichés via $GLOBALS['messageSuccess']
+  - Les erreurs de permission redirigent vers access_denied
+  - Les erreurs AJAX retournent du JSON avec http_response_code(403)
+
+================================================================================
+FIN DE DOCUMENTATION
+================================================================================

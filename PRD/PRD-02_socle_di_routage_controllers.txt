@@ -1,0 +1,178 @@
+# PRD-02 - Socle DI, routage et controllers
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-01
+- Portee: backend core
+
+## Resume executif
+Ce PRD construit le socle technique du backend: injection de dependances avec `symfony/dependency-injection`, routage unifie (legacy + cible) et standardisation de la couche controller.
+
+## Objectifs
+1. Remplacer l'instanciation manuelle diffuse par un container DI central.
+2. Unifier le routage moderne et legacy sans rupture fonctionnelle.
+3. Normaliser les controllers (HTTP orchestration uniquement).
+4. Etablir un pattern standard de reponse (HTML/JSON/redirect).
+
+## Contraintes non negociables
+1. Aucun changement schema BDD.
+2. Aucune rupture sur `?page=...&action=...`.
+3. Pas de logique metier lourde en controller.
+4. Pas de SQL en controller.
+5. Design front inchange.
+
+## Probleme actuel observe
+- Controllers heterogenes, parfois tres volumineux.
+- Instanciation manuelle repetee (`new ServiceX(...)`) et couplage fort.
+- Dispatch actions via chaines conditionnelles fragiles.
+- Difficultes de test unitaire des endpoints.
+
+## Architecture cible
+```text
+ContainerFactory
+  -> ServiceContainer (Symfony DI)
+    -> RouterFacade
+      -> LegacyRouteAdapter + ModernRouteMap
+        -> BaseController + Traits
+```
+
+## Composants a implementer
+- `app\Core\ContainerFactory.php`
+- `app\Core\ServiceContainer.php` (wrapper du container Symfony)
+- `app\Core\RouterFacade.php`
+- `app\Core\LegacyRouteAdapter.php`
+- `app\Controllers\BaseController.php`
+- `app\Controllers\Traits\ApiResponseTrait.php`
+- `app\Controllers\Traits\ActionDispatchTrait.php`
+- `app\Controllers\Traits\ControllerValidationTrait.php`
+
+## Specifications fonctionnelles detaillees
+- FR-02-01: chaque controller est resolu par DI.
+- FR-02-02: chaque action controller recoit des DTO simples.
+- FR-02-03: legacy `page/action` mappe vers handlers standards.
+- FR-02-04: responses JSON normalisees (`success`, `data`, `errors`, `meta`).
+- FR-02-05: codes HTTP coherents (200/201/400/401/403/404/422/500).
+- FR-02-06: gestion explicite des erreurs metier et techniques.
+
+## Specifications techniques detaillees
+- NFR-02-01: definitions services dans `config/services.php` (ou equivalent).
+- NFR-02-02: autowiring controle + aliases explicites.
+- NFR-02-03: hooks middleware securite conserves.
+- NFR-02-04: logger injecte dans controllers critiques.
+- NFR-02-05: compatibilite PHP/projet actuelle.
+
+## Contrats de classes (exemple)
+```php
+interface RouteDispatcherInterface {
+    public function dispatch(array $server, array $get, array $post): Response;
+}
+
+abstract class BaseController {
+    protected function jsonSuccess(array $data = [], int $status = 200): Response;
+    protected function jsonError(string $message, array $errors = [], int $status = 400): Response;
+    protected function redirect(string $url, array $flash = []): Response;
+}
+```
+
+## Modules impactes
+- Entry points: `index.php`, `public\app\index.php`, `public\layout.php`.
+- Core: `Bootstrap`, `Router`, `Request`, `Response`, `Session`, `Csrf`.
+- Security chain: `PermissionMiddleware`, `AuthorizationService`, `RouteActionResolver`.
+- Controllers priorites: `GestionRapportController`, `ProgrammationSoutenanceController`, `EvaluationDossiersController`, `GestionEtudiantController`.
+
+## Tables concernees (lecture uniquement via services)
+- `route_actions`, `fonctionnalites`, `permissions`, `groupe_utilisateur`
+- `utilisateur`, `pister` (traces d'acces/actions)
+
+## Plan de migration
+1. Introduire container et l'utiliser sur quelques controllers pilotes.
+2. Ajouter facade de routage avec adaptateur legacy.
+3. Migrer progressivement les controllers critiques.
+4. Basculer les autres controllers par lots.
+5. Supprimer les instanciations manuelles residuelles.
+
+## Strategie de test
+- Tests unitaires du container (resolution de services).
+- Tests d'integration routing (legacy + moderne).
+- Tests controller contracts (JSON shape, redirects).
+- Tests de non regression sur pages majeures:
+  - dashboard
+  - gestion_etudiants
+  - gestion_rapports
+  - evaluation dossiers
+  - programmation soutenance
+
+## Criteres d'acceptation
+- 100% des nouveaux controllers passent par DI.
+- Legacy routes fonctionnent comme avant.
+- Controllers ne contiennent ni SQL ni regles metier lourdes.
+- Schema BDD inchange.
+
+## Risques et mitigations
+- Risque: erreurs de resolution DI en production.  
+  Mitigation: compilation/validation container au demarrage.
+- Risque: route mismatch legacy.  
+  Mitigation: matrice de tests sur `route_actions` + `permission_registry`.
+- Risque: migration partielle incoherente.  
+  Mitigation: lotissement par domaine + feature flags.
+
+## Definition of done
+- BaseController + traits en production.
+- Container DI actif sur les domaines pilotes.
+- Documentation d'usage controllers/DI livree.
+
+## Annexe detaillee B - specifications DI/routing au niveau operationnel
+
+### Catalogue minimal des services du container
+| Service ID | Classe | Scope | Dependances |
+|---|---|---|---|
+| `router.facade` | RouterFacade | singleton | LegacyRouteAdapter, ModernRouteMap |
+| `security.permission_gate` | PermissionGate | singleton | AuthorizationService |
+| `controller.resolver` | ControllerResolver | singleton | ServiceContainer |
+| `response.factory` | ResponseFactory | singleton | none |
+
+### Convention de nommage route/action
+- Route legacy: `?page={slug}&action={token}`.
+- Controller cible: `{Domaine}{Feature}Controller`.
+- Methode action cible: `{verb}{Noun}Action`.
+- Mapping central obligatoire dans un registre unique.
+
+### Matrice de resolution des requetes
+1. Parser methode HTTP + query params.
+2. Resoudre route moderne si presente.
+3. Sinon resolver legacy via `page/action`.
+4. Evaluer permission sur action CRUD.
+5. Executer controller cible.
+6. Retourner response standard.
+
+### Contrat JSON standard backend
+```json
+{
+  "success": true,
+  "data": {},
+  "errors": [],
+  "meta": { "request_id": "...", "timestamp": "..." }
+}
+```
+
+### Contrat erreurs HTTP standard
+- 400: input mal forme
+- 401: non authentifie
+- 403: permission refusee
+- 404: ressource/route introuvable
+- 409: conflit metier
+- 422: validation metier
+- 500: erreur interne non metier
+
+### Scenarios de migration controllers
+- Scenario 1: controller legacy simple -> BaseController direct.
+- Scenario 2: controller legacy multi-action -> ActionDispatchTrait.
+- Scenario 3: controller JSON mixte -> ApiResponseTrait + DTO d'entree.
+
+### Checklist DI/routing
+- [ ] Service resolvable sans instanciation manuelle.
+- [ ] Route legacy et route cible aboutissent au meme use-case.
+- [ ] Le middleware permission est execute avant action.
+- [ ] Les responses respectent le contrat standard.
+- [ ] Les exceptions non metier sont sanitizees.

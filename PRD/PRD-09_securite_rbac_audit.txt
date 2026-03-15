@@ -1,0 +1,161 @@
+# PRD-09 - Securite, RBAC, audit et contexte device
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-02, PRD-03, PRD-04, PRD-05, PRD-08
+- Composants imposes: `jenssegers/agent`, `symfony/string`, `nesbot/carbon`
+
+## Resume executif
+Ce PRD renforce la securite applicative backend: authentification, autorisation RBAC, protections anti-abus, traçabilite complete et enrichissement des logs avec contexte appareil/navigateur.
+
+## Objectifs
+1. Consolidation des controles auth/RBAC existants.
+2. Homogeneisation des checks permission sur tous endpoints.
+3. Audit enrichi et exploitable pour securite et support.
+4. Preservation de la compatibilite legacy et de la logique metier.
+
+## Contraintes non negociables
+1. Aucun changement schema BDD.
+2. Aucun endpoint ecriture sans verification permission + CSRF.
+3. Journalisation explicite des evenements critiques.
+4. Pas de diffusion d'informations sensibles dans les erreurs.
+
+## Composants a implementer
+- `app\Security\SecurityContext.php`
+- `app\Security\PermissionGate.php`
+- `app\Security\RateLimitPolicy.php`
+- `app\Security\DeviceContextResolver.php` (`jenssegers/agent`)
+- `app\Security\SecurityAuditService.php`
+- `app\Security\ErrorSanitizer.php` (`symfony/string`)
+
+## Axe 1 - Authentification
+- Verification identifiants + statuts utilisateur.
+- Durcissement rate limit login.
+- Politique mot de passe renforcee.
+- Gestion session sure (regeneration, expiration, invalidation).
+
+## Axe 2 - Autorisation RBAC
+- Unifier checks `canView/canCreate/canEdit/canDelete`.
+- Aligner checks sur `route_actions`, `fonctionnalites`, `permissions`.
+- Garantir verification systematique sur endpoints JSON et forms.
+- Maintenir mapping groupes 5-13 (admin, scolarite, commission, enseignant, etudiant, etc.).
+
+## Axe 3 - Audit et traçabilite
+- Evenements audites:
+  - login success/failure
+  - tentative brute force
+  - access denied
+  - actions metier critiques (validation, suppression, generation docs)
+- Enrichissement contextuel:
+  - IP
+  - user-agent parse (device/browser/os via `jenssegers/agent`)
+  - horodatage normalise Carbon
+
+## Exigences fonctionnelles (FR)
+- FR-09-01: chaque action sensible a un log securite.
+- FR-09-02: chaque deny permission est trace.
+- FR-09-03: chaque endpoint d'ecriture valide CSRF.
+- FR-09-04: reponses erreurs nettoyees et non verbeuses.
+- FR-09-05: vue operateur securite sur evenements critiques.
+
+## Exigences techniques (NFR)
+- NFR-09-01: hooks securite reutilisables en middleware.
+- NFR-09-02: compatibilite route legacy.
+- NFR-09-03: latence de verification permission maitrisee (cache PRD-05).
+- NFR-09-04: testabilite complete des policies.
+
+## Tables concernees
+- `utilisateur`, `groupe_utilisateur`, `type_utilisateur`
+- `permissions`, `fonctionnalites`, `route_actions`
+- `auth_rate_limits`
+- `pister` (audit)
+- `app_settings` (parametres securite applicatifs)
+
+## Modules impactes
+- Security core:
+  - `AuthService`
+  - `AuthorizationService`
+  - `RouteActionResolver`
+  - `DbRateLimiter`
+  - `PermissionMiddleware`
+- Controllers: tous points d'entree ecriture.
+- Services: workflows critiques (rapport, evaluation, parametrage, utilisateurs).
+
+## Plan d'implementation
+1. Definir SecurityContext et PermissionGate.
+2. Unifier middleware checks.
+3. Introduire DeviceContextResolver + SecurityAuditService.
+4. Durcir erreurs et logs securite.
+5. Executer campagne de tests de securite.
+
+## Strategie de test
+- Tests unitaires permission policies.
+- Tests integration deny/allow par role.
+- Tests CSRF sur formulaires et endpoints JSON.
+- Tests brute force/rate limit.
+- Tests formatage des logs securite.
+
+## Criteres d'acceptation
+- Couverture securite uniforme sur endpoints critiques.
+- Audit enrichi disponible pour incident response.
+- Aucun endpoint ecriture sans permission + CSRF.
+- Schema BDD inchange.
+
+## Risques et mitigations
+- Risque: faux positifs deny.  
+  Mitigation: matrice role/route/action et tests automatiques.
+- Risque: surcharge logs.  
+  Mitigation: niveau de log parametre + retention geree.
+- Risque: ecarts legacy non traces.  
+  Mitigation: hooks centralises sur adaptateur de routage.
+
+## Definition of done
+- PermissionGate et SecurityAuditService actifs.
+- Device context integre dans les logs.
+- Campagne de tests securite validee.
+
+## Annexe detaillee I - modele de menace et controles de securite
+
+### Matrice de menaces principale
+| Menace | Surface | Controle |
+|---|---|---|
+| Brute force login | endpoint auth | rate limit + verrouillage temporaire |
+| Escalade privilege | routes metier | PermissionGate + tests role/action |
+| CSRF | formulaires POST | token obligatoire + verification stricte |
+| Injection SQL | filtres/recherche | prepared statements + whitelists |
+| Fuite info sensible | erreurs API | ErrorSanitizer + messages neutres |
+
+### Dictionnaire evenements d'audit securite
+- `SEC_LOGIN_SUCCESS`
+- `SEC_LOGIN_FAILURE`
+- `SEC_RATE_LIMIT_TRIGGERED`
+- `SEC_PERMISSION_DENIED`
+- `SEC_CSRF_FAILED`
+- `SEC_ROLE_CHANGED`
+
+### Champs minimum de log securite
+- `event_code`
+- `actor_id`
+- `route`
+- `method`
+- `ip`
+- `device_type`
+- `browser`
+- `os`
+- `occurred_at`
+
+### Procedure de reponse incident (niveau 1)
+1. Detecter evenement critique via logs.
+2. Isoler le compte ou l'IP suspecte.
+3. Capturer traces et contexte technique.
+4. Evaluer impact metier.
+5. Appliquer correctif/mitigation.
+6. Documenter post-mortem.
+
+### Checklist securite
+- [ ] Tous endpoints ecriture couverts RBAC + CSRF.
+- [ ] Rate limit actif et teste.
+- [ ] Logs securite enrichis avec contexte device.
+- [ ] Erreurs sanitisees.
+- [ ] Aucun changement schema BDD.

@@ -1,0 +1,953 @@
+================================================================================
+WORKFLOW COMPLET DE SOUTENANCE - CHECKMASTER UFRMI
+================================================================================
+Document: 09_workflow_soutenance_complet.txt
+Version: 1.0
+Date: 2026-03-14
+Description: Documentation complete du processus de soutenance de memoire,
+             de la candidature a la generation du PV final.
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+  PHASE 1: CANDIDATURE (Etudiant)
+  PHASE 2: REDACTION ET DEPOT DU RAPPORT (Etudiant)
+  PHASE 3: VERIFICATION DES RAPPORTS (Scolarite / Commission)
+  PHASE 4: EVALUATION PAR LA COMMISSION (Commission)
+  PHASE 5: COMPTE RENDU DE COMMISSION (Commission / Enseignant)
+  PHASE 6: PROGRAMMATION DU JURY (Commission / Admin)
+  PHASE 7: PLANIFICATION DE LA SOUTENANCE (Commission / Admin)
+  PHASE 8: EVALUATION DE LA SOUTENANCE (Jury)
+  PHASE 9: PV FINAL - PROCESSION-VERBAL (Systeme)
+
+  ANNEXE A: CHAINE COMPLETE DES TABLES
+  ANNEXE B: DIAGRAMME D'ETAT DES STATUTS
+  ANNEXE C: POINTS DE CONNEXION ENTRE MODULES
+
+================================================================================
+PHASE 1: CANDIDATURE (Etudiant)
+================================================================================
+
+Description:
+  L'etudiant soumet sa candidature pour la soutenance de memoire. Il doit
+  d'abord remplir les informations de son stage/entreprise, puis soumettre
+  sa candidature.
+
+Acteur principal: Etudiant (num_carte_etud)
+
+Controleur: CandidatureSoutenanceController
+Service:    CandidatureSoutenanceService (220 lignes)
+Models:     Etudiant, Entreprise, InfoStage, MaitreDeStage, AuditLog
+
+Tables impliquees:
+  - etudiants                    (lecture: verification etudiant)
+  - informations_stage           (ecriture: donnees du stage)
+  - entreprises                  (lecture/ecriture: entreprise d'accueil)
+  - maitres_de_stage             (lecture/ecriture: maitre de stage)
+  - candidature_soutenance       (ecriture: enregistrement candidature)
+  - audit_log                    (ecriture: trace d'audit)
+
+Etapes detaillees:
+
+  1.1 REMPLISSAGE DES INFORMATIONS DE STAGE
+
+      L'etudiant remplit le formulaire contenant:
+        - Entreprise d'accueil (selection ou creation nouvelle)
+        - Maitre de stage (nom, prenom, fonction)
+        - Dates de debut et fin du stage
+        - Sujet du stage/memoire
+        - Description du projet
+
+      Methode: CandidatureSoutenanceService::enregistrerInfoStage()
+      Table: informations_stage
+      Champs cles:
+        - num_etu (FK vers etudiants.num_carte_etud)
+        - id_entreprise (FK vers entreprises)
+        - id_maitre_stage (FK vers maitres_de_stage)
+        - date_debut_stage, date_fin_stage
+        - sujet_stage
+        - description
+
+      Validations:
+        - Les dates doivent etre dans le passe (date_fin_stage <= date du jour)
+        - Duree minimale du stage >= 6 mois
+        - L'etudiant doit etre inscrit pour l'annee academique en cours
+
+  1.2 SOUMISSION DE LA CANDIDATURE
+
+      Methode: CandidatureSoutenanceService::soumettreCandidature()
+      Table: candidature_soutenance
+      Champs cles:
+        - id_candidature (PK auto-increment)
+        - num_etu (FK vers etudiants)
+        - id_annee_acad (FK vers annee_academique)
+        - date_candidature
+        - statut = 'En attente'
+        - id_utilisateur (qui a soumis)
+
+      Conditions prealables:
+        - Les informations de stage doivent etre completes
+        - L'etudiant ne doit pas avoir de candidature en cours pour la meme annee
+        - L'annee academique doit etre active (write-gating via AcademicYear)
+
+  1.3 AUDIT
+
+      Apres soumission reussie:
+        - AuditLog::log() enregistre l'action
+        - Action: 'SOUMETTRE_CANDIDATURE'
+        - Cible: num_etu
+        - Valeurs: statut='En attente'
+
+Methodes disponibles du service:
+  - getStageInfo($num_etu): Recupere les infos de stage existantes
+  - getCandidature($num_etu): Recupere la candidature courante
+  - getCandidatures($num_etu): Recupere toutes les candidatures
+  - getAllEntreprises(): Liste des entreprises disponibles
+  - getAllMaitresDeStage(): Liste des maitres de stage
+  - soumettreCandidature($etudiant_id, $id_utilisateur): Soumission
+  - enregistrerInfoStage(...): Enregistrement/modification info stage
+
+
+================================================================================
+PHASE 2: REDACTION ET DEPOT DU RAPPORT (Etudiant)
+================================================================================
+
+Description:
+  L'etudiant redige son rapport de memoire en ligne (editeur HTML), le sauvegarde
+  en brouillon, puis le depose officiellement. Le depot declenche automatiquement
+  la creation d'une candidature_soutenance si elle n'existe pas.
+
+Acteur principal: Etudiant
+
+Controleur: GestionRapportController
+Service:    GestionRapportService (1148 lignes)
+Models:     RapportEtudiant, Etudiant, Approuver, AuditLog, InfoStage, Entreprise
+Generator:  RapportPdfGeneratorService (459 lignes)
+
+Tables impliquees:
+  - rapport_etudiants            (ecriture: contenu du rapport)
+  - etudiants                    (lecture: infos etudiant)
+  - informations_stage           (lecture: sujet/entreprise)
+  - deposer                      (ecriture: acte de depot)
+  - candidature_soutenance       (ecriture: auto-creation)
+  - document_genere              (ecriture: enregistrement PDF)
+
+Etapes detaillees:
+
+  2.1 CREATION DU RAPPORT (Brouillon)
+
+      Methode: GestionRapportService::sauvegarderRapport()
+      Table: rapport_etudiants
+      Champs cles:
+        - id_rapport (PK)
+        - num_etu (FK vers etudiants)
+        - statut = 'brouillon'
+        - nom_rapport / theme_rapport
+        - contenu_rapport (HTML)
+        - chemin_fichier (chemin vers le fichier HTML sur disque)
+        - date_rapport / date_redaction_rapport
+        - id_annee_acad
+
+      Stockage:
+        - Le contenu HTML est sauvegarde dans ressources/uploads/rapports/
+        - Le chemin est enregistre dans chemin_fichier
+        - Format: rapport_{matricule}_{annee}_{timestamp}.html
+
+  2.2 SAUVEGARDE DU CONTENU
+
+      Methode: GestionRapportService::sauvegarderRapport()
+      - Mise a jour du champ contenu_rapport (HTML)
+      - Mise a jour de chemin_fichier si nouveau fichier
+      - Le statut reste 'brouillon'
+      - L'etudiant peut sauvegarder autant de fois que necessaire
+
+  2.3 DEPOT OFFICIEL
+
+      Methode: GestionRapportService::enregistrerDepotRapport()
+      Actions:
+        1. Mise a jour du statut: 'brouillon' -> 'en cours'
+        2. Insertion dans la table 'deposer' (acte de depot)
+        3. Si pas de candidature_soutenance existante:
+           - Creation automatique avec statut='En attente'
+        4. AuditLog: 'DEPOSER_RAPPORT'
+
+      Table: deposer
+      Champs cles:
+        - num_etu (FK)
+        - id_rapport (FK)
+        - date_depot
+        - annee_acad
+
+      Contraintes:
+        - Un seul depot actif par etudiant par annee academique
+        - Le rapport doit avoir un contenu non vide
+        - L'annee academique doit etre writable (AcademicYear::ensureWritableYear)
+
+  2.4 EXPORT PDF DU RAPPORT
+
+      Methode: RapportPdfGeneratorService::generate()
+      Service: RapportPdfGeneratorService (459 lignes)
+
+      Contenu du PDF:
+        - Page de couverture avec logos institutionnels
+          (UFHB logo + UFR-MI logo)
+        - Informations etudiant (nom, prenom, matricule, niveau)
+        - Theme du memoire
+        - Entreprise d'accueil
+        - Contenu du rapport (converti HTML -> PDF via TCPDF)
+        - Mise en forme automatique
+
+      Sortie:
+        - Fichier: rapport_{matricule}_{annee}_{timestamp}.pdf
+        - Chemin: storage/documents/rapports/{annee}/
+        - Enregistrement: document_genere table
+
+
+================================================================================
+PHASE 3: VERIFICATION DES RAPPORTS (Scolarite / Commission)
+================================================================================
+
+Description:
+  Le personnel de scolarite ou les membres de la commission verifient les
+  rapports depots par les etudiants. Ils peuvent les approuver ou les rejeter.
+
+Acteur principal: Scolarite (PersAdmin) ou Commission
+
+Controleur: VerificationRapportsController
+Service:    VerificationRapportsService (358 lignes)
+Models:     RapportEtudiant, Approuver, PersAdmin, AuditLog
+
+Tables impliquees:
+  - rapport_etudiants            (lecture/mise a jour: statut)
+  - approuver                    (ecriture: decision d'approbation)
+  - personnel_admin              (lecture: verificateur)
+  - audit_log                    (ecriture: trace)
+
+Etapes detaillees:
+
+  3.1 LISTE DES RAPPORTS A VERIFIER
+
+      Methode: VerificationRapportsService::getRapportsDeposes()
+      - Filtre: statut='en cours' (rapports recemment deposes)
+      - Jointure: etudiants, informations_stage
+      - Retourne: liste avec infos etudiant, sujet, date depot
+
+  3.2 APPROBATION D'UN RAPPORT
+
+      Methode: VerificationRapportsService::validerRapport($id_rapport, $id_verificateur)
+      Actions:
+        1. Insertion dans 'approuver':
+           - id_rapport (FK vers rapport_etudiants)
+           - id_pers_admin (FK vers personnel_admin)
+           - id_approb = 4 (code d'approbation)
+           - date_approb
+           - commentaire (optionnel)
+        2. Mise a jour du statut du rapport: 'en cours' -> 'approuve'
+        3. AuditLog: 'APPROUVER_RAPPORT'
+
+      Table: approuver
+      Champs cles:
+        - id_rapport
+        - id_pers_admin
+        - id_approb (FK vers niveau_approbation, ex: 4 = approuve)
+        - date_approb
+        - observation
+
+  3.3 REJET D'UN RAPPORT
+
+      Methode: VerificationRapportsService::rejeterRapport($id_rapport, $id_verificateur, $motif)
+      Actions:
+        1. Insertion dans 'approuver' avec id_approb different (rejet)
+        2. Mise a jour statut: 'en cours' -> 'rejete'
+        3. L'etudiant recoit une notification avec le motif du rejet
+        4. AuditLog: 'REJETER_RAPPORT'
+
+  3.4 CONSULTATION DES DETAILS
+
+      Methode: VerificationRapportsService::getDetailsRapport($id_rapport)
+      - Rapport complet avec historique des decisions
+      - Commentaires des evaluateurs
+
+
+================================================================================
+PHASE 4: EVALUATION PAR LA COMMISSION (Commission)
+================================================================================
+
+Description:
+  Les membres de la commission d'evaluation votent sur chaque rapport verifie.
+  Chaque membre exprime son vote (valider/rejeter) avec un commentaire.
+  Le rapport est finalise selon le resultat du vote.
+
+Acteur principal: Membres de la Commission
+
+Controleur: EvaluationDossiersController
+Service:    EvaluationDossiersService (538 lignes), ProcessusValidationService (565 lignes)
+Models:     RapportEtudiant, EvaluationRapport, Valider, AuditLog
+
+Tables impliquees:
+  - rapport_etudiants            (lecture/mise a jour)
+  - evaluations_rapports         (ecriture: votes des membres)
+  - valider                      (ecriture: decision finale)
+  - commission_evaluation        (lecture: membres de la commission)
+  - audit_log                    (ecriture)
+
+Etapes detaillees:
+
+  4.1 LISTE DES DOSSIERS A EVALUER
+
+      Methode: EvaluationDossiersService::getDossiersAEvaluer()
+      - Filtre: rapports avec statut='approuve'
+      - Jointure: etudiant, informations_stage
+      - Affiche: statut de vote par membre
+
+  4.2 VOTE DES MEMBRES DE LA COMMISSION
+
+      Methode: EvaluationDossiersService::evaluerDossier()
+      ou:       ProcessusValidationService::voter()
+
+      Table: evaluations_rapports
+      Champs cles:
+        - id_evaluation (PK)
+        - id_rapport (FK vers rapport_etudiants)
+        - id_enseignant / id_utilisateur (FK vers le votant)
+        - vote: 'valider' | 'rejeter'
+        - commentaire (texte libre)
+        - date_evaluation
+
+      Logique:
+        - Chaque membre de la commission peut voter une seule fois par rapport
+        - Le vote est enregistre avec un commentaire obligatoire
+        - Un membre peut modifier son vote avant la finalisation
+
+  4.3 FINALISATION DU PROCESSUS DE VOTATION
+
+      Methode: ProcessusValidationService::finaliserRapport($id_rapport)
+
+      Logique de decision:
+        1. Compter le nombre de votes 'valider'
+        2. Decision:
+           - Si count('valider') >= 4  => VALIDER le rapport
+           - Si count('valider') < 4   => REJETER le rapport
+
+      Actions si VALIDATION:
+        1. Insertion dans 'valider':
+           - id_rapport
+           - id_commission_evaluation
+           - date_validation
+           - decision = 'valider'
+        2. Mise a jour statut rapport: 'approuve' -> 'valide'
+        3. AuditLog: 'VALIDER_RAPPORT'
+
+      Actions si REJET:
+        1. Insertion dans 'valider' avec decision='rejeter'
+        2. Mise a jour statut: 'approuve' -> 'rejete_commission'
+        3. Notification a l'etudiant
+
+  4.4 STATISTIQUES DE VALIDATION
+
+      Methode: ProcessusValidationService::getStatistiques()
+      - Nombre total de rapports en evaluation
+      - Nombre valides, rejetes, en attente
+      - Taux de validation
+      - Temps moyen de traitement (DashboardCommissionService)
+
+
+================================================================================
+PHASE 5: COMPTE RENDU DE COMMISSION (Commission / Enseignant)
+================================================================================
+
+Description:
+  Apres validation par la commission, un compte rendu est redige pour
+  consigner les decisions et recommandations. Les encadrants et directeurs
+  de memoire sont affectes aux etudiants.
+
+Acteur principal: Commission (redacteur du compte rendu)
+
+Controleur: RedactionCompteRenduController
+Service:    RedactionCompteRenduService (239 lignes)
+Models:     CompteRendu, RapportEtudiant, Etudiant, Enseignant
+Generator:  PvCommissionGeneratorService (333 lignes)
+
+Tables impliquees:
+  - compte_rendu                 (ecriture: contenu du CR)
+  - compte_rendu_rapport         (ecriture: pivot CR <-> rapports)
+  - rapport_etudiants            (lecture: rapports valides)
+  - affecter                     (ecriture: affectation encadrant/directeur)
+  - enseignants                  (lecture: enseignants disponibles)
+  - etudiants                    (lecture: etudiant concerne)
+  - document_genere              (ecriture: PDF du PV)
+
+Etapes detaillees:
+
+  5.1 REDACTION DU COMPTE RENDU
+
+      Methode: RedactionCompteRenduService::enregistrer()
+      Table: compte_rendu
+      Champs cles:
+        - id_CR (PK)
+        - num_etu (FK)
+        - nom_CR / titre du compte rendu
+        - contenu_CR (texte HTML)
+        - chemin_fichier_pdf
+        - date_CR
+        - id_annee_acad
+
+  5.2 LIEN AVEC LES RAPPORTS
+
+      Table pivot: compte_rendu_rapport
+      Champs cles:
+        - id_CR (FK vers compte_rendu)
+        - id_rapport (FK vers rapport_etudiants)
+
+      Un compte rendu peut concerner plusieurs rapports (batch).
+
+  5.3 AFFECTATION DES ENCADRANTS
+
+      Methode: Affectation des enseignants aux etudiants
+      Table: affecter
+      Champs cles:
+        - num_etu (FK vers etudiants)
+        - num_ens (FK vers enseignants)
+        - role: 'encadrant' | 'directeur'
+        - date_affectation
+        - id_annee_acad
+
+      Roles:
+        - EN = Encadrant (supervision pedagogique)
+        - DM = Directeur de memoire (responsable academique)
+
+  5.4 GENERATION DU PDF DU PV DE COMMISSION
+
+      Methode: PvCommissionGeneratorService::generate($compteRenduId, $userId)
+      Service: PvCommissionGeneratorService (333 lignes)
+
+      Contenu du PDF:
+        - En-tete institutionnel (logos UFHB + UFR-MI)
+        - Reference: PVC-{annee}-{numero}
+        - Informations de session (periode, membres)
+        - Tableau des rapports evalues avec decisions
+        - Affectations des encadrants
+        - Recommandations de la commission
+        - Signatures
+
+      Sortie:
+        - Fichier: pv_commission_{annee}_{id}_{timestamp}.pdf
+        - Chemin: storage/documents/pv_commission/{annee}/
+        - Enregistrement: document_genere table
+
+  5.5 NOTIFICATION DES ETUDIANTS
+
+      Methode: RedactionCompteRenduService::exporterPdf()
+      - Envoi d'email aux etudiants concernes
+      - EmailService::sendEmail() ou sendEmailWithAttachment()
+      - Template: REPORT_NOTIFICATION (email_templates.php)
+
+
+================================================================================
+PHASE 6: PROGRAMMATION DU JURY (Commission / Admin)
+================================================================================
+
+Description:
+  La commission ou l'administration programme la soutenance en affectant
+  les membres du jury avec leurs roles respectifs. Operation transactionnelle.
+
+Acteur principal: Commission ou Administrateur
+
+Controleur: ProgrammationSoutenanceController (avec CRUD AJAX)
+Service:    ProgrammationSoutenanceService (859 lignes)
+Models:     Enseignant, Attribution
+
+Tables impliquees:
+  - programmer_soutenance        (ecriture: programmation principale)
+    (alias: programmer selon version du schema)
+  - enseignant_jury              (ecriture: composition du jury)
+    (alias: composer_jury selon version du schema)
+  - qualite_jury / roles_jury    (lecture: types de roles)
+  - enseignants                  (lecture: enseignants disponibles)
+  - audit_log                    (ecriture)
+
+Etapes detaillees:
+
+  6.1 CREATION DE LA PROGRAMMATION
+
+      Methode: ProgrammationSoutenanceService::createAttribution()
+      Table: programmer_soutenance
+      Champs cles:
+        - num_soutenance (PK)
+        - num_etu (FK vers etudiants)
+        - id_annee_acad
+        - statut = 'programme'
+
+      Detection automatique du nom de table:
+        - getProgrammationTable() teste programmer_soutenance puis programmer
+        - Pattern de compatibilite schema legacy vs courant
+
+  6.2 AFFECTATION DES MEMBRES DU JURY
+
+      Methode: ProgrammationSoutenanceService::affecterJury()
+
+      Table: enseignant_jury
+      Champs cles:
+        - num_soutenance (FK vers programmer_soutenance)
+        - num_ens (FK vers enseignants)
+        - qualite / role (code du role)
+
+      Roles disponibles:
+        - EN = Encadrant (supervision pedagogique de l'etudiant)
+        - EX = Examinateur (evalue le contenu technique)
+        - DM = Directeur de memoire (responsable academique du sujet)
+        - PJ = President du jury (doit etre professeur titulaire)
+        - MS = Maitre de stage (representant de l'entreprise)
+
+      Contraintes:
+        - Le president du jury (PJ) doit etre un professeur titulaire
+        - Un enseignant ne peut pas avoir deux roles dans le meme jury
+        - Minimum: President + Examinateur + Encadrant
+
+  6.3 GESTION TRANSACTIONNELLE
+
+      Methode: ProgrammationSoutenanceService (transactions PDO)
+
+      Pattern:
+        $pdo->beginTransaction();
+        try {
+            // 1. Insertion programmer_soutenance
+            // 2. Insertion enseignant_jury (pour chaque membre)
+            $pdo->commit();
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+      Si l'insertion d'un membre du jury echoue, toute la programmation
+      est annulee (rollback).
+
+  6.4 MODIFICATION ET SUPPRESSION
+
+      Methode: updateAttribution(), deleteAttribution()
+      - Modification possible tant que la planification n'est pas faite
+      - Suppression: cascade sur enseignant_jury
+      - AuditLog pour chaque operation
+
+
+================================================================================
+PHASE 7: PLANIFICATION DE LA SOUTENANCE (Commission / Admin)
+================================================================================
+
+Description:
+  Apres programmation du jury, la soutenance est planifiee en affectant
+  une salle, une date et une heure. Le systeme detecte les conflits.
+
+Acteur principal: Commission ou Administrateur
+
+Controleur: PlanificationSoutenanceController
+Service:    PlanificationSoutenanceService (519 lignes)
+Models:     Salle
+
+Tables impliquees:
+  - programmer_soutenance        (mise a jour: salle, date, heure)
+  - salles                       (lecture: salles disponibles)
+  - audit_log                    (ecriture)
+
+Etapes detaillees:
+
+  7.1 ASSIGNATION DE LA SALLE
+
+      Methode: PlanificationSoutenanceService::planifier()
+      Champ: id_salle (FK vers salles)
+
+      Salles disponibles:
+        - S. CONF (salle de conference)
+        - S. 207 (salle 207)
+        - Autres salles configurees dans la table 'salles'
+
+  7.2 ASSIGNATION DE LA DATE ET HEURE
+
+      Champs:
+        - date_soutenance (format: YYYY-MM-DD)
+        - heure_soutenance (format: HH:MM)
+
+  7.3 DETECTION DES CONFLITS
+
+      Methode: PlanificationSoutenanceService::detecterConflits()
+
+      Regle: La meme salle ne peut pas etre reservee pour la meme
+      date et heure (avec tolerance pour la duree estimée).
+
+      Verification:
+        SELECT COUNT(*) FROM programmer_soutenance
+        WHERE id_salle = ? AND date_soutenance = ? AND heure_soutenance = ?
+        AND num_soutenance != ?
+
+      Si conflit detecte: retour d'erreur avec details.
+
+  7.4 FINALISATION DE LA PLANIFICATION
+
+      La planification est complete quand les 3 elements sont definis:
+        - id_salle (non null)
+        - date_soutenance (non null)
+        - heure_soutenance (non null)
+
+      Mise a jour du statut: 'programme' -> 'planifie'
+
+  7.5 SUPPRESSION DE PLANIFICATION
+
+      Methode: PlanificationSoutenanceService::supprimer()
+      - Remet salle, date, heure a null
+      - Statut: 'planifie' -> 'programme'
+      - AuditLog
+
+
+================================================================================
+PHASE 8: EVALUATION DE LA SOUTENANCE (Jury)
+================================================================================
+
+Description:
+  Le jour de la soutenance, chaque membre du jury evalue l'etudiant selon
+  5 criteres avec des baremes differents. Les notes sont enregistrees par
+  critere et par membre du jury.
+
+Acteur principal: Membres du jury
+
+Controleur: EvaluationSoutenanceController
+Service:    EvaluationSoutenanceService (1197 lignes)
+Models:     CritereEvaluation
+
+Tables impliquees:
+  - evaluer                      (ecriture: notes par critere)
+  - critere_evaluation           (lecture: criteres disponibles)
+  - bareme_critere               (lecture: baremes par critere)
+  - programmer_soutenance        (lecture: soutenance)
+  - enseignant_jury              (lecture: jury)
+  - qualite_jury / roles_jury    (lecture: roles)
+  - notes                        (lecture: notes M1, M2)
+  - audit_log                    (ecriture)
+
+Etapes detaillees:
+
+  8.1 ENREGISTREMENT D'UNE EVALUATION
+
+      Methode: EvaluationSoutenanceController::enregistrerEvaluation()
+      Service: EvaluationSoutenanceService::enregistrerEvaluation()
+
+      Pour chaque etudiant, le jury note 5 criteres:
+
+      CRITERES D'EVALUATION:
+      ┌─────────────────────────────────────────────────────────────┐
+      │ Code │ Critere                          │ Bareme (ex: 20) │
+      ├─────────────────────────────────────────────────────────────┤
+      │ CM   │ Contenu du memoire               │ 4 points        │
+      │ EX   │ Expose (presentation orale)      │ 4 points        │
+      │ PM   │ Presentation du memoire          │ 2 points        │
+      │ RP   │ Resolution du probleme           │ 5 points        │
+      │ RQ   │ Reponses aux questions           │ 5 points        │
+      ├─────────────────────────────────────────────────────────────┤
+      │ TOTAL│                                   │ 20 points       │
+      └─────────────────────────────────────────────────────────────┘
+
+      Table: evaluer
+      Cle composite PK: (num_etudiant, num_jury, id_critere)
+      Champs:
+        - num_etudiant (FK vers etudiants)
+        - num_jury (FK vers enseignant_jury)
+        - id_critere (FK vers critere_evaluation)
+        - note (valeur numerique)
+        - date_evaluation
+
+      Chaque membre du jury attribue une note pour chaque critere.
+      Le bareme maximum est defini dans bareme_critere.
+
+  8.2 MODIFICATION D'UNE EVALUATION
+
+      Methode: EvaluationSoutenanceService::enregistrerEvaluation()
+      - Si evaluation existe deja: UPDATE
+      - Sinon: INSERT
+      - La note doit etre <= bareme du critere
+
+  8.3 SUPPRESSION D'UNE EVALUATION
+
+      Methode: EvaluationSoutenanceService::supprimerEvaluation()
+      - DELETE FROM evaluer WHERE num_etudiant=? AND num_jury=? AND id_critere=?
+      - AuditLog
+
+  8.4 RECUPERATION DES DONNEES PV
+
+      Methode: EvaluationSoutenanceService::getDonneesPV($soutenanceId)
+      Retourne:
+        - Notes de chaque jury pour chaque critere
+        - Moyennes par critere
+        - Notes M1 et M2 (depuis table notes)
+        - Decision du jury
+
+
+================================================================================
+PHASE 9: PV FINAL - PROCESSION-VERBAL (Systeme)
+================================================================================
+
+Description:
+  Generation automatique du proces-verbal final de soutenance avec 3 annexes.
+  Le PV definit la decision finale du jury (ADMIS, AJOURNE, REFUSE) et la
+  mention obtenue.
+
+Acteur: Systeme (declenche par le jury ou l'administration)
+
+Controleur: EvaluationSoutenanceController::imprimerPV()
+Service:    PvFinalGeneratorService (771 lignes)
+Utils:      PlanningDataUtils (615 lignes)
+
+Tables impliquees:
+  - programmer_soutenance        (lecture: soutenance)
+  - etudiants                    (lecture: etudiant)
+  - enseignant_jury              (lecture: jury - 5 roles)
+  - evaluer                      (lecture: evaluations criteres)
+  - critere_evaluation           (lecture: criteres)
+  - bareme_critere               (lecture: baremes)
+  - notes                        (lecture: M1, M2)
+  - sessions                     (lecture: session)
+  - salles                       (lecture: salle)
+  - document_genere              (ecriture: enregistrement PDF)
+
+Etapes detaillees:
+
+  9.1 ANNEXE 1: TABLEAU DES NOTES DE SOUTENANCE
+
+      Contenu:
+        - Tableau criteres x notes (lignes = criteres, colonnes = jury)
+        - 5 criteres: CM, EX, PM, RP, RQ
+        - Notes de chaque membre du jury
+        - Total des notes
+        - Decision du jury
+        - Lignes de signature pour chaque membre du jury
+
+      Methode: PvFinalGeneratorService::buildAnnexe1Rows()
+      - Mappe les notes brutes vers les 5 criteres
+      - Normalise les scores selon les baremes
+      - Couleur: bleu acier (70, 130, 180)
+
+  9.2 ANNEXE 2: CALCUL PONDERE (Formule principale)
+
+      Formule:
+        Note Finale = (M1 * 2 + M2_S1 * 3 + Note_Memoire * 3) / 8
+
+      Ou:
+        M1 = Moyenne generale du premier semestre (depuis table notes)
+        M2_S1 = Moyenne generale du deuxieme semestre
+        Note_Memoire = Moyenne des notes de soutenance (Annexe 1)
+
+      Couleur: vert olive (107, 142, 35)
+
+  9.3 ANNEXE 3: CALCUL ALTERNATIF
+
+      Formule:
+        Note Finale = (M1 * 1 + Note_Memoire * 2) / 3
+
+      Couleur: rouge fonce (139, 0, 0)
+
+  9.4 MAPPING DES MENTIONS
+
+      ┌────────────────────────────────────────────────────┐
+      │ Note Finale    │ Mention                           │
+      ├────────────────────────────────────────────────────┤
+      │ < 8            │ Insuffisant                       │
+      │ 8 - 9.99       │ Passable                          │
+      │ 10 - 11.99     │ Assez-Bien                        │
+      │ 12 - 13.99     │ Bien                              │
+      │ 14 - 15.99     │ Tres-Bien                         │
+      │ >= 16          │ Honorable                         │
+      └────────────────────────────────────────────────────┘
+
+      Methode: EvaluationSoutenanceService::calculerMention()
+
+  9.5 DECISION DU JURY
+
+      ┌────────────────────────────────────────────────────┐
+      │ Decision  │ Signification                         │
+      ├────────────────────────────────────────────────────┤
+      │ ADMIS     │ L'etudiant a reussi la soutenance     │
+      │ AJOURNE   │ L'etudiant doit repasser              │
+      │ REFUSE    │ L'etudiant a echoue                   │
+      └────────────────────────────────────────────────────┘
+
+  9.6 SAUVEGARDE ET ENREGISTREMENT
+
+      Methode: PvFinalGeneratorService::generate()
+
+      Sortie:
+        - Fichier PDF: pv_final_{num_soutenance}_{timestamp}.pdf
+        - Chemin: storage/documents/pv_finaux/{annee}/
+        - Table: document_genere
+          * type_document = 'PVF'
+          * chemin_fichier
+          * date_generation
+          * id_utilisateur (qui a genere)
+          * reference (ex: PVF-2026-00001)
+
+      Metadata PDF:
+        - Titre: "Proces-Verbal de Soutenance"
+        - Auteur: "CheckMaster UFRMI"
+        - Format: A4 Portrait
+
+
+================================================================================
+ANNEXE A: CHAINE COMPLETE DES TABLES
+================================================================================
+
+Voici la chaine complete des tables impliquees dans le processus de soutenance,
+de la candidature au PV final:
+
+  etudiants
+    │
+    ├──> candidature_soutenance     (Phase 1: Candidature)
+    │      ├── statut: 'En attente'
+    │      └── id_annee_acad
+    │
+    ├──> informations_stage         (Phase 1: Info stage)
+    │      ├── id_entreprise -> entreprises
+    │      └── id_maitre_stage -> maitres_de_stage
+    │
+    ├──> rapport_etudiants          (Phase 2: Rapport)
+    │      ├── statut: 'brouillon' -> 'en cours' -> 'approuve' -> 'valide'
+    │      └── contenu_rapport, chemin_fichier
+    │
+    ├──> deposer                    (Phase 2: Depot)
+    │      ├── id_rapport -> rapport_etudiants
+    │      └── date_depot
+    │
+    ├──> approuver                  (Phase 3: Verification)
+    │      ├── id_rapport -> rapport_etudiants
+    │      ├── id_pers_admin -> personnel_admin
+    │      └── id_approb (4 = approuve)
+    │
+    ├──> evaluations_rapports       (Phase 4: Votes commission)
+    │      ├── id_rapport -> rapport_etudiants
+    │      ├── vote: 'valider' | 'rejeter'
+    │      └── commentaire
+    │
+    ├──> valider                    (Phase 4: Decision finale)
+    │      ├── id_rapport -> rapport_etudiants
+    │      └── decision
+    │
+    ├──> compte_rendu               (Phase 5: CR commission)
+    │      ├── contenu_CR
+    │      └── chemin_fichier_pdf
+    │
+    ├──> compte_rendu_rapport       (Phase 5: Pivot CR-rapports)
+    │      ├── id_CR -> compte_rendu
+    │      └── id_rapport -> rapport_etudiants
+    │
+    ├──> affecter                   (Phase 5: Encadrant/directeur)
+    │      ├── num_ens -> enseignants
+    │      └── role: 'encadrant' | 'directeur'
+    │
+    ├──> programmer_soutenance      (Phase 6: Programmation)
+    │      ├── num_soutenance (PK)
+    │      ├── id_salle -> salles
+    │      ├── date_soutenance
+    │      └── heure_soutenance
+    │
+    ├──> enseignant_jury            (Phase 6: Composition jury)
+    │      ├── num_soutenance -> programmer_soutenance
+    │      ├── num_ens -> enseignants
+    │      └── qualite/role: EN|EX|DM|PJ|MS
+    │
+    ├──> evaluer                    (Phase 8: Notes soutenance)
+    │      ├── (num_etudiant, num_jury, id_critere) = PK composite
+    │      ├── id_critere -> critere_evaluation
+    │      └── note (<= bareme)
+    │
+    ├──> critere_evaluation         (Phase 8: Definition criteres)
+    │      └── bareme_critere (bareme par critere)
+    │
+    ├──> notes                      (Notes M1, M2)
+    │      └── num_etu = PK (une seule annee)
+    │
+    └──> document_genere            (Phase 9: PDF generes)
+           ├── type_document: 'PVF'|'PVC'|'RPT'|'PLN'|'REC'
+           ├── chemin_fichier
+           └── reference
+
+
+================================================================================
+ANNEXE B: DIAGRAMME D'ETAT DES STATUTS
+================================================================================
+
+Statuts du rapport (rapport_etudiants.statut):
+
+  [Cree] --sauvegarder--> [brouillon]
+  [brouillon] --deposer--> [en cours]
+  [en cours] --approuver--> [approuve]
+  [en cours] --rejeter--> [rejete]
+  [approuve] --valider (commission)--> [valide]
+  [approuve] --rejeter (commission)--> [rejete_commission]
+
+Statuts de la candidature (candidature_soutenance.statut):
+
+  [En attente] --valider--> [Acceptee]
+  [En attente] --rejeter--> [Refusee]
+
+Statuts de la soutenance (programmer_soutenance.statut):
+
+  [programme] --planifier--> [planifie]
+  [planifie] --evaluer--> [evalue]
+  [evalue] --PV genere--> [termine]
+
+
+================================================================================
+ANNEXE C: POINTS DE CONNEXION ENTRE MODULES
+================================================================================
+
+  1. ETUDIANT -> SCOLARITE -> COMMISSION -> SOUTENANCE -> PV
+
+     Etudiant soumet candidature
+         │
+         ▼
+     Scolarite verifie le rapport (VerificationRapportsService)
+         │
+         ├── Approuve -> Commission evalue (EvaluationDossiersService)
+         │                    │
+         │                    ├── Valide -> Compte rendu (RedactionCompteRenduService)
+         │                    │                   │
+         │                    │                   ▼
+         │                    │              Programmation jury (ProgrammationSoutenanceService)
+         │                    │                   │
+         │                    │                   ▼
+         │                    │              Planification (PlanificationSoutenanceService)
+         │                    │                   │
+         │                    │                   ▼
+         │                    │              Soutenance (EvaluationSoutenanceService)
+         │                    │                   │
+         │                    │                   ▼
+         │                    │              PV Final (PvFinalGeneratorService)
+         │                    │
+         │                    └── Rejete -> Notification etudiant
+         │
+         └── Rejete -> Notification etudiant (retour phase 2)
+
+  2. PAIEMENT -> INSCRIPTION -> NOTES -> CANDIDATURE
+
+     Paiement (GestionScolariteService)
+         │
+         ▼
+     Inscription (InscriptionService)
+         │
+         ▼
+     Notes (NotesService)
+         │
+         ▼
+     Eligibilite candidature soutenance
+
+  3. CREATION UTILISATEUR -> EMAIL -> RESET PASSWORD
+
+     Creation utilisateur (GestionUtilisateurService)
+         │
+         ▼
+     Email notification (EmailService)
+         │
+         ▼
+     Reset password flow (createPasswordResetToken)
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

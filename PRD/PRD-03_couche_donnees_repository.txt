@@ -1,0 +1,181 @@
+# PRD-03 - Couche donnees: Repository, QueryBuilder, ORM mapper
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-01, PRD-02
+- Portee: data access backend
+
+## Resume executif
+Ce PRD introduit une couche donnees propre pour supprimer la duplication SQL, fiabiliser les acces DB et rendre les services metier lisibles. La couche cible combine Repository, QueryBuilder et mapper ORM leger, en gardant le schema existant strictement intact.
+
+## Objectifs
+1. Centraliser l'acces donnees par aggregate metier.
+2. Retirer le SQL direct des controllers/services lourds.
+3. Standardiser les requetes complexes et la pagination.
+4. Gerer proprement les cles composites (cas `inscriptions`).
+
+## Contraintes non negociables
+1. Aucun changement de schema BDD.
+2. Toutes les colonnes/tables doivent correspondre a `docs3\audit.txt`.
+3. Interdiction des requetes concatenees non preparees.
+4. Aucun fallback silencieux en cas d'erreur SQL.
+
+## Probleme actuel observe
+- SQL disperse dans de nombreux fichiers.
+- Requetes similaires implementees plusieurs fois.
+- Incoherences de conventions (noms champs legacy/courants).
+- Difficultes de maintenance de requetes complexes (dashboards, archives, soutenances).
+
+## Architecture cible de la couche data
+```text
+Service metier
+  -> Repository
+    -> QueryBuilder
+      -> QueryExecutor (PDO + erreurs + logs)
+        -> Mapper ORM leger (Entity <-> Row)
+```
+
+## Composants a creer
+- `app\Support\Sql\QueryBuilder.php`
+- `app\Support\Sql\QueryExecutor.php`
+- `app\Support\Sql\QueryCatalog.php`
+- `app\Repositories\BaseRepository.php`
+- `app\Repositories\StudentRepository.php`
+- `app\Repositories\InscriptionRepository.php`
+- `app\Repositories\RapportRepository.php`
+- `app\Repositories\SoutenanceRepository.php`
+- `app\Repositories\UserRepository.php`
+- `app\Repositories\ArchiveRepository.php`
+
+## Regles de conception QueryBuilder
+- Jointures explicites et whitelistees.
+- Pagination uniforme (limit, offset, total).
+- Tri whiteliste uniquement.
+- Construction de requetes composees reutilisables.
+- Binding parametres obligatoire.
+
+## Regles ORM mapper leger
+- Pas de magie runtime lourde.
+- Mapping explicite entite <-> colonnes.
+- Support des cles composites:
+  - `inscriptions`: `num_carte_etud + id_annee_acad + num_versement`
+- Modeles minces: pas de logique metier complexe.
+
+## Exigences fonctionnelles (FR)
+- FR-03-01: chaque service metier lit/ecrit via repository.
+- FR-03-02: `GestionRapportService` bascule vers `RapportRepository`.
+- FR-03-03: `EvaluationSoutenanceService` bascule vers `SoutenanceRepository`.
+- FR-03-04: `GestionEtudiantService` bascule vers `StudentRepository`.
+- FR-03-05: statistiques dashboards passent par `QueryCatalog`.
+
+## Exigences techniques (NFR)
+- NFR-03-01: temps de reponse reduit via requetes mutualisees.
+- NFR-03-02: observabilite SQL (duree, endpoint, erreur, nb lignes).
+- NFR-03-03: robustesse transactionnelle pour ecritures critiques.
+- NFR-03-04: couverture tests repositories >= 80%.
+
+## Matrice tables -> repositories
+- `etudiants`, `inscriptions` -> `StudentRepository`, `InscriptionRepository`
+- `rapport_etudiants`, `deposer`, `valider`, `evaluations_rapports` -> `RapportRepository`
+- `programmer_soutenance`, `enseignant_jury`, `evaluer`, `notes` -> `SoutenanceRepository`
+- `utilisateur`, `groupe_utilisateur`, `permissions` -> `UserRepository`
+- `pister`, `document_genere`, `candidature_soutenance` -> `ArchiveRepository`
+
+## Contrats exemples
+```php
+final class StudentRepository extends BaseRepository {
+    public function findByCard(string $numCarte): ?StudentEntity;
+    public function findByYear(int $anneeId, array $filters, int $page, int $limit): PaginatedResult;
+}
+
+final class InscriptionRepository extends BaseRepository {
+    public function findCurrentByStudent(string $numCarte): ?InscriptionEntity;
+    public function saveVersement(InscriptionVersementInput $input): void;
+}
+```
+
+## Plan d'implementation
+1. Introduire QueryExecutor + QueryBuilder + tests.
+2. Migrer repositories priorites (student, inscription, rapport).
+3. Migrer services hotspots vers repositories.
+4. Remplacer SQL duplique par QueryCatalog.
+5. Nettoyer l'ancien code SQL residuel.
+
+## Strategie de test
+- Unit tests QueryBuilder (where/join/order/pagination).
+- Unit tests repositories avec fixtures.
+- Integration tests sur flux:
+  - inscription/versement
+  - depot rapport
+  - evaluation et decision
+  - recherche archives
+
+## Criteres d'acceptation
+- 0 SQL en controllers.
+- Services pilotes sans SQL inline.
+- Gestion correcte de la cle composite `inscriptions`.
+- Aucun changement schema BDD.
+
+## Risques et mitigations
+- Risque: migration incomplete d'un service critique.  
+  Mitigation: migration par tranche + adaptateurs temporaires.
+- Risque: divergence colonnes legacy.  
+  Mitigation: mapping explicite aligne audit + tests fixtures.
+- Risque: regressions SQL.  
+  Mitigation: snapshots de resultats sur cas metiers critiques.
+
+## Definition of done
+- Repositories cibles operationnels sur les domaines prioritaires.
+- QueryBuilder/QueryExecutor utilises en production.
+- Documentation "table -> repository -> service" finalisee.
+
+## Annexe detaillee C - dictionnaire data access et garde-fous transactionnels
+
+### Dictionnaire des repositories cibles (niveau methodes)
+#### StudentRepository
+- `findByCard(string $numCarte): ?StudentEntity`
+- `search(array $filters, int $page, int $limit): PaginatedResult`
+- `existsByIdentifiant(string $numIdent): bool`
+
+#### InscriptionRepository
+- `findLatestByStudent(string $numCarte): ?InscriptionEntity`
+- `saveVersement(VersementInput $input): void`
+- `findByYearAndNiveau(int $annee, int $niveau): array`
+
+#### RapportRepository
+- `findRapportById(int $id): ?RapportEntity`
+- `changeStatus(int $idRapport, string $from, string $to): void`
+- `listByCommissionFilters(array $filters): PaginatedResult`
+
+#### SoutenanceRepository
+- `findProgrammationByStudent(string $numCarte): ?ProgrammationEntity`
+- `assignJury(int $numSoutenance, array $jury): void`
+- `saveEvaluation(EvaluationInput $input): void`
+
+### Frontieres transactionnelles obligatoires
+- Transaction obligatoire:
+  - enregistrement versement + audit
+  - depot rapport + trace deposer + audit
+  - decision commission + mise a jour statut + audit
+  - evaluation soutenance + calcul note + enregistrement
+- Interdiction de transaction geante cross-use-case.
+
+### Regles SQL obligatoires
+1. Requetes preparees uniquement.
+2. Champs whitelistes pour ORDER BY.
+3. Pagination native obligatoire sur listes volumineuses.
+4. Aucun `SELECT *` en dehors des cas explicitement justifies.
+5. Aucun alias table/colonne hors mapping documente.
+
+### Mapping sensible a surveiller
+- `inscriptions` : cle composite `num_carte_etud + id_annee_acad + num_versement`.
+- Flux recu/paiement: ne pas reintroduire une dependance a `id_inscription`.
+- `rapport_etudiants`: respecter les noms de colonnes reels (audit).
+
+### Checklist data review
+- [ ] Methode repository alignee sur use-case metier.
+- [ ] SQL conforme au schema `audit.txt`.
+- [ ] Transactions presentes sur ecritures critiques.
+- [ ] Aucun SQL inline residuel dans controller.
+- [ ] Couverture tests repository validee.

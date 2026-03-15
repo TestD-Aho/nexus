@@ -1,0 +1,164 @@
+# PRD-04 - Validation et normalisation des donnees
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-01, PRD-02, PRD-03
+- Composants imposes: `respect/validation`, `symfony/string`, `nesbot/carbon`
+
+## Resume executif
+Ce PRD met en place un moteur de validation fluide, centralise et reutilisable pour toutes les saisies (dates, textes, nombres), tout en standardisant la normalisation de chaines et la gestion des dates metier.
+
+## Objectifs
+1. Uniformiser la validation backend sur tous les flux.
+2. Centraliser les regles metier critiques (stages, notes, paiements, candidatures).
+3. Nettoyer et normaliser les textes saisis.
+4. Fiabiliser les calculs temporels avec Carbon.
+
+## Contraintes non negotiables
+1. Aucun changement schema BDD.
+2. Validation obligatoire avant toute ecriture DB.
+3. Retour d'erreur explicite et exploitable (422 + details).
+4. Pas de duplication des regles entre controllers/services/models.
+
+## Composants a implementer
+- `app\Validation\ValidationEngine.php` (wrapper `respect/validation`)
+- `app\Validation\Rules\*` (regles metier)
+- `app\Validation\ValidationErrorBag.php`
+- `app\Support\Text\StringNormalizer.php` (base `symfony/string`)
+- `app\Support\Date\DatePolicy.php` (base `nesbot/carbon`)
+
+## Regles de validation transverses
+- Dates:
+  - format strict attendu
+  - coherence intervalle debut/fin
+  - contraintes metier de duree
+- Textes:
+  - trim, collapse espaces, nettoyage caracteres de controle
+  - longueur min/max selon contexte
+  - sanitization backend
+- Nombres:
+  - bornes min/max
+  - precision monetaire stable
+  - non negativite selon use-case
+
+## Exigences fonctionnelles (FR)
+- FR-04-01: validation etudiant (identite, mail, promotion).
+- FR-04-02: validation inscription/versement.
+- FR-04-03: validation candidature et info stage.
+- FR-04-04: validation depot rapport et statuts.
+- FR-04-05: validation notes/evaluations soutenance.
+- FR-04-06: normalisation des messages/reclamations/commentaires.
+
+## Exigences techniques (NFR)
+- NFR-04-01: regles composees reutilisables (`Respect\Validation\Validator`).
+- NFR-04-02: mapping erreurs stable pour API et vues server-side.
+- NFR-04-03: tests unitaires des regles metier.
+- NFR-04-04: zero exception non geree liee aux dates.
+
+## Cas metiers obligatoires
+1. Stage: duree minimale selon politique academique.
+2. Paiement: montant verse >= 0 et coherence avec frais.
+3. Rapport: titre/theme non vides, statut valide.
+4. Soutenance: notes dans bornes autorisees.
+5. Reclamation: objet/description obligatoires et tailles valides.
+
+## Contrats exemples
+```php
+final class ValidationEngine {
+    public function validate(array $input, array $rules): ValidationResult;
+}
+
+final class DatePolicy {
+    public function parseAcademicDate(string $value): Carbon;
+    public function ensurePeriodIsValid(Carbon $start, Carbon $end): void;
+}
+```
+
+## Tables concernees (ecritures protegees par validation)
+- `etudiants`, `inscriptions`, `rapport_etudiants`
+- `candidature_soutenance`, `informations_stage`
+- `evaluer`, `notes`, `reclamations`, `utilisateur`
+
+## Integration par couches
+- Controller: collecte input brut + appel validation.
+- Service: applique regles metier composees.
+- Repository: execute seulement si validation OK.
+- Error handling: objet d'erreur standard.
+
+## Plan d'implementation
+1. Cadrer taxonomie des erreurs et format de retour.
+2. Implementer moteur de validation et normalisation.
+3. Migrer flux critiques (auth, etudiant, rapport, evaluation).
+4. Etendre aux flux secondaires (archives, parametres, import).
+5. Finaliser tests et guide developpeur.
+
+## Strategie de test
+- Unit tests par regle.
+- Tests de non regression sur formulaires majeurs.
+- Tests de bords (valeurs limites, dates invalides, encodage).
+- Tests i18n textes avec `symfony/string`.
+
+## Criteres d'acceptation
+- Toutes les ecritures critiques passent par ValidationEngine.
+- Messages d'erreur coherents et exploitables.
+- Dates metier calculees via Carbon.
+- Aucun changement schema BDD.
+
+## Risques et mitigations
+- Risque: incoherence ancienne/nouvelle validation.  
+  Mitigation: mode compat + migration progressive par endpoint.
+- Risque: rejet excessif de donnees legacy.  
+  Mitigation: strategie de normalisation avant validation stricte.
+- Risque: explosion de regles ad hoc.  
+  Mitigation: catalogue central des regles et revue obligatoire.
+
+## Definition of done
+- Moteur de validation central actif.
+- Regles metier critiques couvertes par tests.
+- Normalisation texte/date generalisee.
+
+## Annexe detaillee D - catalogue de regles "au pixel" par formulaire
+
+### Matrice des regles de validation par flux
+| Flux | Champs critiques | Regles minimales |
+|---|---|---|
+| Login | login, mot de passe | non vide, longueur min, charset autorise |
+| Etudiant | num_carte_etud, nom_etu, prenom_etu, email_etu | format, unicite metier, longueur |
+| Inscription | id_annee_acad, id_niv_etude, montant_verse | domaine de valeurs, bornes montants |
+| Rapport | theme_rapport, contenu_rapport | non vide, taille min, statut valide |
+| Evaluation | id_critere, note, commentaire | note dans bornes, commentaire taille max |
+
+### Codes d'erreurs standards
+- `VAL-001` champ obligatoire manquant
+- `VAL-002` format invalide
+- `VAL-003` valeur hors borne
+- `VAL-004` incoherence inter-champs
+- `VAL-005` regle metier violee
+
+### Politique de normalisation texte (symfony/string)
+1. Trim global des champs texte.
+2. Reduction espaces multiples -> espace simple.
+3. Normalisation unicode pour comparaison.
+4. Nettoyage caracteres de controle non autorises.
+5. Politique stricte sur longueurs min/max par champ.
+
+### Politique date (Carbon)
+- Toutes les dates parsees en timezone applicative unique.
+- Regles de comparaison date debut/date fin centralisees.
+- Fonctions utilitaires pour calcul de delais metiers.
+- Conversion vers format DB uniquement en sortie de service.
+
+### Tests de validation obligatoires
+- Cas nominal valide par flux.
+- Cas limites (bornes min/max).
+- Cas invalides multi-erreurs.
+- Cas encodage/texte special.
+- Cas dates incoherentes.
+
+### Checklist validation
+- [ ] Aucune ecriture sans validation prealable.
+- [ ] Erreurs metier codees et exploitables.
+- [ ] Regles centralisees et reutilisees.
+- [ ] Parse date uniquement via Carbon.
+- [ ] Normalisation texte activee avant persistence.

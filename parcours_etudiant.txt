@@ -1,0 +1,558 @@
+================================================================================
+  DOCUMENTATION TECHNIQUE CHECKMASTER — PARCOURS ÉTUDIANT (GROUPE 13)
+  Journey complet de l'utilisateur Étudiant dans l'application
+  Date : 14 mars 2026
+================================================================================
+
+
+1. TABLE DES MATIÈRES
+=====================
+
+1.  Connexion
+2.  Tableau de bord étudiant
+3.  Candidature à la soutenance
+4.  Gestion des rapports
+5.  Suivi du rapport
+6.  Réclamations
+7.  Consultation des comptes rendus
+8.  Notes et résultats
+9.  Profil et changement de mot de passe
+10. Déconnexion
+11. Matrice des permissions étudiant
+12. Gestion des erreurs
+
+
+2. CONNEXION
+============
+
+URL : ?page=login
+Méthode : GET (affichage) / POST (soumission)
+Permission : Route publique (pas d'authentification requise)
+
+Flux :
+------
+1. L'étudiant accède à ?page=login
+2. Affichage du formulaire (layout.php inclut la vue login)
+3. Soumission POST avec login_utilisateur + mdp_utilisateur
+4. AuthController::login($login, $password)
+   → AuthService::login($login, $password, $ip)
+5. AuthService::login() :
+   a. Création du DbRateLimiter
+   b. Vérification isAllowed('login', $ip, $identifier)
+      - Si bloqué → retour "Trop de tentatives"
+   c. Utilisateur::verifierConnexion($login, $password)
+      - Vérifie le hash du mot de passe via password_verify()
+      - Support legacy : hash_equals() pour mots de passe en clair
+   d. Si succès :
+      - session_regenerate_id(true) → protection fixation
+      - Population des variables de session :
+        $_SESSION['id_utilisateur']
+        $_SESSION['nom_utilisateur']
+        $_SESSION['statut_utilisateur']
+        $_SESSION['login_utilisateur']
+        $_SESSION['type_utilisateur'] = 'Etudiant'
+        $_SESSION['id_GU'] = 13
+        $_SESSION['lib_GU'] = 'Etudiant'
+        $_SESSION['niveau_acces']
+      - Pour type_utilisateur == 'Etudiant' :
+        Etudiant::getEtudiantByLogin($login)
+        → $_SESSION['num_etu'] = num_carte_etud
+        → $_SESSION['nom_etu']
+        → $_SESSION['prenom_etu']
+      - AuditLog::logConnexion() → journalise le succès
+      - DbRateLimiter::reset() → supprime les tentatives
+      - Retour ['success' => true]
+   e. Si échec :
+      - DbRateLimiter::hit() → enregistre la tentative
+        (maxAttempts=5, windowSeconds=900, blockSeconds=600)
+      - Retour ['success' => false, 'message' => 'Identifiants incorrects.']
+6. Redirection :
+   - Succès → ?page=candidature_soutenance ou ?page=dashboard
+   - Échec → retour au formulaire avec message d'erreur
+
+Tables impliquées :
+- utilisateur (vérification login/mdp)
+- groupe_utilisateur (récupération libellé groupe)
+- type_utilisateur (récupération type)
+- etudiants (récupération infos étudiant)
+- auth_rate_limits (rate limiting)
+- audit_log (journalisation)
+
+Protection sécurité :
+- DbRateLimiter : max 5 tentatives / 15 min, blocage 10 min
+- password_verify() pour hash bcrypt
+- session_regenerate_id() après connexion
+- Cookies session sécurisés (httponly, samesite=Lax)
+
+
+3. TABLEAU DE BORD ÉTUDIANT
+===========================
+
+URL : ?page=dashboard (ou ?page=dashboard selon la redirection)
+Permission : Voir (tous les groupes authentifiés)
+
+Flux :
+------
+1. NotesResultatsController::index()
+2. NotesResultatsService::populateIndexGlobals($studentId)
+3. Récupère :
+   - Notes de l'étudiant (table notes)
+   - Moyennes M1/M2
+   - Classement dans la promotion
+4. Variables mises dans $GLOBALS pour la vue
+
+Tables impliquées :
+- notes (moyennes par année)
+- etudiants (info étudiant)
+- annee_academique (année en cours)
+
+
+4. CANDIDATURE À LA SOUTENANCE
+==============================
+
+URL : ?page=candidature_soutenance
+Permission : Voir (peut_voir sur candidature_soutenance)
+Contrôleur : CandidatureSoutenanceController
+
+Le parcours se déroule en plusieurs étapes :
+
+
+4.1 Étape 1 — Informations de stage (action=info_stage)
+-------------------------------------------------------
+
+URL : ?page=candidature_soutenance&action=info_stage
+Méthode : POST
+
+Flux :
+1. CandidatureSoutenanceController::infoStage()
+2. Vérifications :
+   - $_SESSION['num_etu'] doit exister (réservé aux étudiants)
+   - canView('candidature_soutenance')
+3. Récupération des données POST :
+   - entreprise (ID ou nom pour création)
+   - date_debut, date_fin
+   - sujet (sujet_stage)
+   - encadrant (maître de stage)
+   - email_encadrant, telephone_encadrant
+4. CandidatureSoutenanceService::enregistrerInfoStage()
+   - Crée ou met à jour la table informations_stage
+   - Crée l'entreprise si elle n'existe pas (table entreprises)
+   - Crée le maître de stage si nécessaire (table maitre_de_stage)
+5. Validation :
+   - Les dates doivent être dans le passé
+   - Durée minimum de stage : 6 mois
+   - Le sujet est obligatoire
+6. Succès → redirection vers ?page=gestion_rapports&action=creer_rapport
+   Échec → retour avec message d'erreur
+
+Tables impliquées :
+- informations_stage (CRUD)
+- entreprises (CRUD si nouvelle)
+- maitre_de_stage (CRUD si nouveau)
+- fonction (référence pour maître de stage)
+
+
+4.2 Étape 2 — Soumission de candidature (action=demande_candidature)
+--------------------------------------------------------------------
+
+URL : ?page=candidature_soutenance&action=demande_candidature
+Méthode : POST
+
+Flux :
+1. CandidatureSoutenanceController::demande_candidature()
+2. Vérifications :
+   - canView('candidature_soutenance')
+   - $_SESSION['num_etu']
+3. CandidatureSoutenanceService::soumettreCandidature()
+   - Vérifie s'il existe déjà une candidature
+   - Crée un enregistrement dans candidature_soutenance :
+     * num_etu = $_SESSION['num_etu']
+     * date_candidature = NOW()
+     * statut_candidature = 'En attente'
+4. Message de succès stocké dans $_SESSION['success']
+
+Tables impliquées :
+- candidature_soutenance (INSERT)
+- informations_stage (vérification préalable)
+
+
+4.3 Vue principale — CandidatureSoutenanceController::index()
+-------------------------------------------------------------
+
+Charge pour l'affichage :
+- $GLOBALS['stage_info'] → informations_stage
+- $GLOBALS['compte_rendu'] → compte_rendu
+- $GLOBALS['has_candidature'] → booléen
+- $GLOBALS['candidatures_etudiant'] → liste des candidatures
+- $GLOBALS['entreprises'] → toutes les entreprises (autocomplete)
+- $GLOBALS['maitres_de_stage'] → tous les maîtres de stage (autocomplete)
+
+Vérification : la page est réservée aux étudiants ($_SESSION['num_etu'])
+ou aux administrateurs.
+
+
+5. GESTION DES RAPPORTS
+=======================
+
+URL : ?page=gestion_rapports
+Permission : Voir (peut_voir sur gestion_rapports)
+Contrôleur : GestionRapportController
+
+
+5.1 Dashboard (index)
+---------------------
+
+GestionRapportController::index()
+
+Pour les étudiants :
+- getStatsEtudiant($num_etu) → statistiques personnelles
+- getRapportsRecentsEtudiant($num_etu, 5) → 5 derniers rapports
+- getInfosDepotRapports($num_etu) → infos de dépôt
+
+Tables : rapport_etudiants, deposer
+
+
+5.2 Créer un rapport (action=creer_rapport)
+-------------------------------------------
+
+URL : ?page=gestion_rapports&action=creer_rapport
+Méthode : GET (formulaire) / POST (soumission)
+
+Flux POST :
+1. GestionRapportController::traiterCreationRapport()
+2. Validation :
+   - nom_rapport obligatoire, min 3 caractères
+   - theme_rapport obligatoire
+   - contenu_rapport (HTML de l'éditeur)
+3. GestionRapportService::sauvegarderRapport()
+   - INSERT dans rapport_etudiants :
+     * num_etu, nom_rapport, theme_rapport, contenu_rapport
+     * statut = 'brouillon'
+     * date_creation = NOW()
+   - Sauvegarde du contenu HTML sur disque :
+     * storage/rapports/[num_etu]/[timestamp]_[nom].html
+4. AuditLog::logAction()
+5. Redirection avec message de succès
+
+Permission requise : peut_creer sur gestion_rapports
+
+Tables : rapport_etudiants (INSERT)
+
+
+5.3 Déposer un rapport (action=deposer_rapport)
+-----------------------------------------------
+
+URL : ?page=gestion_rapports&action=deposer_rapport
+Méthode : POST
+
+Flux :
+1. GestionRapportController::traiterDepotRapport()
+2. Vérifications :
+   - Le rapport doit exister et appartenir à l'étudiant
+   - Le statut doit être 'brouillon' ou 'en cours'
+   - Ne peut pas déposer un rapport déjà déposé
+3. GestionRapportService::enregistrerDepotRapport()
+   - INSERT dans deposer (num_etu, id_rapport, date_depot)
+   - UPDATE rapport_etudiants SET statut = 'en cours'
+   - Auto-création de candidature_soutenance si inexistante
+4. AuditLog
+
+Tables : deposer (INSERT), rapport_etudiants (UPDATE),
+         candidature_soutenance (INSERT si nécessaire)
+
+
+5.4 Export PDF (action=export_pdf)
+---------------------------------
+
+URL : ?page=gestion_rapports&action=export_pdf&id_rapport=X
+
+Flux :
+1. GestionRapportController::exporterPdf()
+2. RapportPdfGeneratorService::generate($rapportId)
+   - Utilise TCPDF
+   - Page de garde avec informations étudiant
+   - Contenu du rapport (conversion HTML → PDF)
+3. En-têtes HTTP pour téléchargement :
+   Content-Type: application/pdf
+   Content-Disposition: attachment; filename=rapport_[nom].pdf
+
+
+5.5 Restrictions
+---------------
+
+- Un rapport déposé ne peut plus être supprimé
+- Un rapport peut être modifié tant qu'il est en statut 'brouillon'
+- L'étudiant ne peut voir que ses propres rapports
+
+
+6. SUIVI DU RAPPORT
+===================
+
+URL : ?page=gestion_rapports&action=suivi_rapport&id_rapport=X
+
+Pipeline de statuts :
+  brouillon → en cours → vérifié → approuvé → évalué → validé
+
+Chaque transition est :
+- Effectuée par un rôle spécifique (secrétaire, commission, etc.)
+- Journalisée dans audit_log
+- Visible par l'étudiant dans le suivi
+
+Tables : rapport_etudiants (statut), evaluations_rapports
+
+
+7. RÉCLAMATIONS
+===============
+
+URL : ?page=gestion_reclamations
+Permission : Voir (peut_voir sur gestion_reclamations)
+Contrôleur : GestionReclamationsController
+
+
+7.1 Soumettre une réclamation (action=soumettre_reclamation)
+-----------------------------------------------------------
+
+URL : ?page=gestion_reclamations&action=soumettre_reclamation
+Méthode : GET (formulaire) / POST (soumission)
+
+Flux POST :
+1. GestionReclamationsController::traiterSoumissionReclamation()
+2. canView('gestion_reclamations')
+3. GestionReclamationsService::preparerDonneesFormulaire($_POST)
+4. Validation :
+   - titre_reclamation : minimum 5 caractères
+   - description : minimum 20 caractères
+   - id_type_reclamation : obligatoire, doit exister
+5. GestionReclamationsService::creerReclamation()
+   - INSERT dans reclamations :
+     * num_etu = $_SESSION['num_etu']
+     * titre_reclamation, description
+     * id_type_reclamation
+     * id_statut_reclamation = 1 (En attente par défaut)
+     * date_soumission = NOW()
+6. AuditLog::logAction()
+7. Redirection avec message de succès
+
+Tables : reclamations (INSERT), type_reclamation (SELECT)
+
+
+7.2 Suivi et historique (action=suivi_historique)
+-------------------------------------------------
+
+URL : ?page=gestion_reclamations&action=suivi_historique
+
+Flux :
+1. GestionReclamationsController::suiviHistorique()
+2. Récupération paginée des réclamations de l'étudiant :
+   - Filtres : par statut, par type, par date
+   - Pagination : configurable (défaut 10/page)
+3. Statistiques personnelles :
+   - Total des réclamations
+   - Par statut (en attente, en traitement, résolue, rejetée)
+
+Tables : reclamations, type_reclamation, statut_reclamation
+
+
+8. CONSULTATION DES COMPTES RENDUS
+==================================
+
+URL : ?page=candidature_soutenance&action=compte_rendu_etudiant
+
+Flux :
+1. CandidatureSoutenanceController::compteRenduRapport()
+2. Récupère le compte rendu via getCompteRendu($etudiant_id)
+3. Affichage du CR généré par la commission
+
+Conditions :
+- L'étudiant doit avoir un compte_rendu lié à son numéro
+- Le CR est créé par la commission après évaluation
+
+Tables : compte_rendu, compte_rendu_rapport
+
+
+9. NOTES ET RÉSULTATS
+=====================
+
+URL : ?page=notes_resultats
+Permission : Voir (peut_voir sur notes_resultats)
+Contrôleur : NotesResultatsController
+
+
+9.1 Consultation
+----------------
+
+NotesResultatsController::index()
+→ NotesResultatsService::populateIndexGlobals($studentId)
+
+Données affichées :
+- Notes par critère d'évaluation (CM, EX, PM, RP, RQ)
+- Moyenne M1 et M2
+- Barème par critère (bareme_critere)
+- Mention calculée (Insuffisant → Honorable)
+- Classement dans la promotion
+- Historique des années
+
+Tables : notes, evaluer, critere_evaluation, bareme_critere,
+         annee_academique, etudiants, mentions
+
+
+9.2 Export PDF relevé
+---------------------
+
+URL : ?page=notes_resultats&action=export_pdf
+
+NotesResultatsController::exportPdf()
+→ NotesResultatsService::generatePdf($studentId)
+
+Génère un relevé de notes PDF avec :
+- Informations étudiant
+- Notes par critère et par année
+- Moyennes et mentions
+- Signature(s) autorisée(s)
+
+
+10. PROFIL ET CHANGEMENT DE MOT DE PASSE
+========================================
+
+URL : ?page=profil
+Permission : Voir + Modifier (viewEdit pour tous les groupes)
+
+10.1 Vue profil
+---------------
+
+Affiche les informations de l'utilisateur depuis $_SESSION.
+
+
+10.2 Changement de mot de passe (tab=password)
+----------------------------------------------
+
+URL : ?page=profil&tab=password
+Méthode : POST
+
+Flux :
+1. AuthController::updatePassword($currentPassword, $newPassword, $confirmPassword)
+2. AuthService::updatePassword()
+3. Validations :
+   - Tous les champs obligatoires
+   - Vérification mot de passe actuel (password_verify + hash_equals)
+   - Confirmation = nouveau mot de passe
+   - Nouveau ≠ ancien
+   - Longueur minimum : 8 caractères
+   - Au moins une majuscule [A-Z]
+   - Au moins un chiffre [0-9]
+   - Au moins un caractère spécial [!@#$%^&*...]
+4. password_hash($newPassword, PASSWORD_DEFAULT) → hash bcrypt
+5. Utilisateur::updatePassword() → UPDATE utilisateur SET mdp_utilisateur
+6. AuditLog::logModification()
+
+Tables : utilisateur (UPDATE), audit_log (INSERT)
+
+
+11. DÉCONNEXION
+===============
+
+URL : ?page=deconnexion (ou appel direct via AuthService)
+Méthode : GET
+
+Flux :
+1. AuthController::logout()
+2. AuthService::logout($idUtilisateur)
+   a. AuditLog::logDeconnexion() → journalise la déconnexion
+   b. $_SESSION = array() → vide la session
+   c. setcookie() → supprime le cookie de session (expiration passée)
+   d. session_destroy()
+3. Redirection vers ?page=login
+
+Tables : audit_log (INSERT)
+
+
+12. MATRICE DES PERMISSIONS ÉTUDIANT (GROUPE 13)
+=================================================
+
+Définie dans permission_registry.php :
+
+Feature                      | Voir | Créer | Modifier | Supprimer
+-----------------------------|------|-------|----------|----------
+candidature_soutenance       | OUI  | -     | -        | -
+gestion_rapports             | OUI  | OUI   | OUI      | -
+gestion_reclamations         | OUI  | OUI   | -        | -
+consultation_cr_etudiant     | OUI  | -     | -        | -
+notes_resultats              | OUI  | -     | -        | -
+profil                       | OUI  | -     | OUI      | -
+
+Catégorie ETUDIANT_ENV : view par défaut pour le groupe étudiant
+Catégorie PROFIL : viewEdit pour tous les groupes
+
+Note : Certaines permissions peuvent être personnalisées par
+l'administrateur via la table permissions en base de données.
+
+
+13. GESTION DES ERREURS — PARCOURS ÉTUDIANT
+===========================================
+
+13.1 Accès non autorisé
+-----------------------
+
+Si un étudiant tente d'accéder à une page sans permission :
+→ PermissionMiddleware::denyAccess()
+→ $_SESSION['error_message'] = "Vous n'avez pas l'autorisation..."
+→ $_SESSION['error_type'] = 'permission_denied'
+→ Redirection vers layout.php?page=access_denied
+
+13.2 Session expirée
+--------------------
+
+Si $_SESSION['id_utilisateur'] n'existe pas :
+→ Redirection vers page_connexion.php
+
+13.3 Erreurs de validation
+--------------------------
+
+Formulaires :
+→ Erreurs stockées dans $_SESSION['erreurs_form']
+→ Affichage dans la vue via $erreurs = $_SESSION['erreurs_form'] ?? []
+→ unset($_SESSION['erreurs_form']) après affichage
+
+13.4 Erreurs serveur
+--------------------
+
+- Erreurs masquées (display_errors=0)
+- Loguées dans logs/php-error.log
+- Message générique affiché à l'utilisateur
+
+
+14. TABLES IMPLIQUÉES DANS LE PARCOURS ÉTUDIANT (RÉSUMÉ)
+========================================================
+
+Table                       | Opérations          | Étape(s)
+----------------------------|---------------------|--------------------------
+utilisateur                 | SELECT              | Connexion
+groupe_utilisateur          | SELECT              | Connexion
+type_utilisateur            | SELECT              | Connexion
+etudiants                   | SELECT              | Connexion, Notes, Rapports
+auth_rate_limits            | SELECT/INSERT/DELETE | Connexion
+audit_log                   | INSERT              | Toutes les actions
+informations_stage          | SELECT/INSERT/UPDATE | Candidature
+entreprises                 | SELECT/INSERT       | Candidature (autocomplete)
+maitre_de_stage             | SELECT/INSERT       | Candidature (autocomplete)
+fonction                    | SELECT              | Candidature (référence)
+candidature_soutenance      | SELECT/INSERT       | Candidature
+rapport_etudiants           | SELECT/INSERT/UPDATE | Rapports
+deposer                     | SELECT/INSERT       | Dépôt de rapport
+evaluations_rapports        | SELECT              | Suivi rapport
+compte_rendu                | SELECT              | Consultation CR
+compte_rendu_rapport        | SELECT              | Consultation CR
+reclamations                | SELECT/INSERT       | Réclamations
+type_reclamation            | SELECT              | Réclamations
+statut_reclamation          | SELECT              | Réclamations
+notes                       | SELECT              | Notes
+evaluer                     | SELECT              | Notes (détail critères)
+critere_evaluation          | SELECT              | Notes (libellés)
+bareme_critere              | SELECT              | Notes (barèmes)
+annee_academique            | SELECT              | Notes, Rapports
+mentions                    | SELECT              | Notes (calcul mention)
+
+
+================================================================================
+  FIN DE LA DOCUMENTATION PARCOURS ÉTUDIANT
+================================================================================

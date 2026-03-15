@@ -1,0 +1,667 @@
+================================================================================
+ANALYSE DES ECARTS, PROBLEMES ET RECOMMANDATIONS - CHECKMASTER UFRMI
+================================================================================
+Document: 13_analyse_ecarts_problemes.txt
+Version: 1.0
+Date: 2026-03-14
+Description: Analyse des ecarts entre le schema de base de donnees et le code,
+             problemes identifies, et recommandations d'amelioration.
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+  1. TABLES EN BASE NON UTILISEES DANS LE CODE
+  2. TABLES DANS LE CODE ABSENTES DU SCHEMA AUDIT.TXT
+  3. INCOHERENCES DE SCHEMA GEREE PAR LE CODE
+  4. PROBLEMES IDENTIFIES
+  5. POINTS DE CONNEXION ENTRE MODULES
+  6. RECOMMANDATIONS
+
+
+================================================================================
+1. TABLES EN BASE NON UTILISEES DANS LE CODE
+================================================================================
+
+Ces tables sont definies dans le schema de la base de donnees (audit.txt)
+mais ne sont pas exploitees par la logique metier du code.
+
+--------------------------------------------------------------------------------
+1.1 filiere
+--------------------------------------------------------------------------------
+
+Statut: DEFINIE MAIS NON UTILISEE
+Schema: id_filiere (PK), nom_filiere, description, ...
+
+Observations:
+  - La table existe dans le schema mais aucun controller ni service
+    ne fait reference a cette table.
+  - Le champ filiere est present dans l'import CSV (ExcelImportService)
+    mais il est traite comme une chaine de caracteres, pas comme
+    une FK vers la table filiere.
+  - L'architecture des niveaux etude (NiveauEtude) semble avoir
+    absorbe partiellement le role de filiere.
+
+Impact: Mineur - les filieres sont gerees implicitement via le champ texte
+        dans les inscriptions ou via NiveauEtude.
+
+--------------------------------------------------------------------------------
+1.2 decisions_jury
+--------------------------------------------------------------------------------
+
+Statut: DEFINIE MAIS NON UTILISEE
+Schema: id_decision (PK), libelle_decision, ...
+
+Observations:
+  - Aucune reference dans le code (controllers, services, models).
+  - La decision du jury est enregistree directement dans les tables
+    valider (decision='valider'|'rejeter') et dans le PV final.
+  - Le mapping ADMIS/AJOURNE/REFUSE est fait dans
+    PvFinalGeneratorService::formaterDecision() avec des strings.
+
+Impact: Aucun - la logique fonctionne sans cette table de reference.
+        Elle pourrait etre utilisee pour standardiser les codes de decision.
+
+--------------------------------------------------------------------------------
+1.3 document
+--------------------------------------------------------------------------------
+
+Statut: DEFINIE AVEC SCHEMA MINIMAL
+Schema: id_document (PK) uniquement
+
+Observations:
+  - Table distincte de document_genere qui est effectivement utilisee.
+  - La table 'document' semble etre un vestige d'un schema anterieur.
+  - Toutes les references dans le code pointent vers document_genere.
+
+Impact: Aucun - document_genere est utilise a la place.
+
+--------------------------------------------------------------------------------
+1.4 niveau_approbation
+--------------------------------------------------------------------------------
+
+Statut: CRUD UNIQUEMENT DANS PARAMETRECONTROLLER, AUCUN WORKFLOW
+Schema: id_approb (PK), libelle_approbation, ...
+
+Observations:
+  - Le model NiveauApprobation existe et est gere par ParametreService.
+  - CRUD disponible via ParametreController pour la gestion des niveaux.
+  - MAIS: Aucun workflow n'utilise cette table pour logique metier.
+  - La table 'approuver' reference id_approb mais la valeur 4 est
+    hardcodee comme code d'approbation (VerificationRapportsService).
+  - Les valeurs ne sont pas verifiees dynamiquement.
+
+Impact: Moyen - Les niveaux d'approbation sont configurables mais
+        pas utilises dans le flux de validation. Risque d'incoherence
+        si un admin change les niveaux sans mettre a jour le code.
+
+Exemple de code problematique:
+  // VerificationRapportsService::validerRapport()
+  $stmt = $pdo->prepare("INSERT INTO approuver (id_rapport, id_pers_admin, id_approb)
+                          VALUES (?, ?, 4)");  // 4 = hardcode!
+
+--------------------------------------------------------------------------------
+1.5 niveau_acces_donnees
+--------------------------------------------------------------------------------
+
+Statut: CRUD UNIQUEMENT, VALEUR NON APPLIQUEE DANS LA LOGIQUE
+Schema: id_niveau_acces (PK), libelle_niveau, ...
+
+Observations:
+  - Reference dans GestionUtilisateurService lors de la creation d'utilisateurs.
+  - Le champ id_niveau_acces est enregistre dans la table utilisateur.
+  - MAIS: Aucune verification de cette valeur dans les services ou controllers.
+  - AuthorizationService utilise les groupes (groupes_utilisateurs) et
+    les permissions, pas le niveau d'acces.
+
+Impact: Moyen - Le champ est enregistre mais non applique. Les
+        restrictions d'acces aux donnees ne sont pas implementees
+        selon ce niveau.
+
+Exemple:
+  // GestionUtilisateurService::addUtilisateur()
+  // id_niveau_acces est sauvegarde mais jamais verifie ailleurs
+  $niveauAcces = $data['niveau_acces'] ?? null;
+  // ... insertion dans utilisateur avec id_niveau_acces
+
+
+================================================================================
+2. TABLES DANS LE CODE ABSENTES DU SCHEMA AUDIT.TXT
+================================================================================
+
+Ces tables sont referencees dans le code mais ne figurent pas dans
+l'extrait du schema audit.txt fourni. Certaines peuvent exister en base
+mais ne pas avoir ete documentees.
+
+--------------------------------------------------------------------------------
+2.1 route_actions
+--------------------------------------------------------------------------------
+
+Referenced: RouteActionResolver::queryRouteAction()
+Description: Mapping des routes vers les actions DB
+Presence probable en base: OUI (necessaire pour le fonctionnement)
+Action: A ajouter a la documentation du schema
+
+--------------------------------------------------------------------------------
+2.2 password_resets
+--------------------------------------------------------------------------------
+
+Referenced: GestionUtilisateurService::createPasswordResetToken()
+Description: Tokens de reinitialisation de mot de passe
+Schema probable: id, user_id, token, expires_at, used_at
+Presence probable en base: OUI
+Action: A ajouter a la documentation du schema
+
+--------------------------------------------------------------------------------
+2.3 personnel_admin
+--------------------------------------------------------------------------------
+
+Referenced: PersAdmin model, VerificationRapportsService
+Description: Personnel administratif
+Presence en base: OUI (table confirmee par le model PersAdmin)
+Note: Schema structure non visible dans l'extrait audit.txt
+Action: Documenter le schema complet
+
+--------------------------------------------------------------------------------
+2.4 programmer_soutenance vs programmer
+--------------------------------------------------------------------------------
+
+Situation: DOUBLE NOM DE TABLE
+Referenced: ProgrammationSoutenanceService, PlanificationSoutenanceService,
+            EvaluationSoutenanceService, PlanningDataUtils
+
+Pattern de gestion:
+  private function getProgrammationTable(): ?string {
+      if ($this->tableExists('programmer_soutenance')) {
+          return 'programmer_soutenance';
+      }
+      if ($this->tableExists('programmer')) {
+          return 'programmer';
+      }
+      return null;
+  }
+
+Explication: Le schema legacy utilise 'programmer' tandis que le schema
+             courant utilise 'programmer_soutenance'. Le code supporte
+             les deux avec detection automatique.
+Action: Documenter les deux noms et clarifier lequel est le schema cible.
+
+--------------------------------------------------------------------------------
+2.5 composer_jury vs enseignant_jury
+--------------------------------------------------------------------------------
+
+Situation: DOUBLE NOM DE TABLE
+Referenced: ProgrammationSoutenanceService, EvaluationSoutenanceService
+
+Pattern de gestion: Idem section 2.4, avec getJuryTable().
+
+Action: Documenter la convention dual.
+
+--------------------------------------------------------------------------------
+2.6 document_genere
+--------------------------------------------------------------------------------
+
+Referenced: PvFinalGeneratorService, PvCommissionGeneratorService,
+            RapportPdfGeneratorService, PlanningGeneratorService,
+            RecuGeneratorService
+
+Description: Trace de tous les documents PDF generes
+Presence en base: CONFIRMEE (utilisee activement)
+Action: Ajouter au schema documente
+
+--------------------------------------------------------------------------------
+2.7 rendre
+--------------------------------------------------------------------------------
+
+Referenced: RepertoireEnseignantService
+Description: Table de liaison enseignant-rapport (rendu de comptes)
+Schema probable: id, num_ens, id_rapport, date_rendu
+Presence probable en base: OUI
+Action: Documenter
+
+--------------------------------------------------------------------------------
+2.8 commission_evaluation
+--------------------------------------------------------------------------------
+
+Referenced: EvaluationDossiersService, ProcessusValidationService
+Description: Membres de la commission d'evaluation
+Schema probable: id, id_enseignant, role, annee_acad
+Presence probable en base: OUI
+Action: Documenter
+
+--------------------------------------------------------------------------------
+2.9 statut_reclamation et type_reclamation
+--------------------------------------------------------------------------------
+
+Referenced: GestionReclamationsService, GestionReclamationsScolariteService
+Description: Tables de reference pour les reclamations
+Presence probable en base: OUI
+Action: Documenter
+
+
+================================================================================
+3. INCOHERENCES DE SCHEMA GEREE PAR LE CODE
+================================================================================
+
+Le code implemente des patterns de compatibilite pour gerer les variations
+de schema entre le legacy et le schema courant.
+
+--------------------------------------------------------------------------------
+3.1 EvaluationSoutenanceService - Detection automatique des tables
+--------------------------------------------------------------------------------
+
+Tables avec double nom supporte:
+  - programmer_soutenance / programmer
+  - composer_jury / enseignant_jury
+  - qualite_jury / roles_jury
+
+Implementation:
+  - Cache des resultats tableExists() et columnExists()
+  - Methodes helper: getProgrammationTable(), getJuryTable(), getRolesTable()
+  - Protection try/catch sur chaque requete
+
+Fichier: app/Services/EvaluationSoutenanceService.php (1197 lignes)
+
+--------------------------------------------------------------------------------
+3.2 DashboardCommissionService - Expressions SQL adaptables
+--------------------------------------------------------------------------------
+
+Champs avec double nom:
+  - date_rapport / date_redaction_rapport
+  - nom_rapport / theme_rapport
+
+Implementation:
+  private function rapportDateExpr(): string {
+      if ($this->columnExists('rapport_etudiants', 'date_rapport')) {
+          return 'r.date_rapport';
+      }
+      if ($this->columnExists('rapport_etudiants', 'date_redaction_rapport')) {
+          return 'r.date_redaction_rapport';
+      }
+      return 'NULL';
+  }
+
+  private function rapportTitleExpr(): string {
+      if ($this->columnExists('rapport_etudiants', 'nom_rapport')) {
+          return 'r.nom_rapport';
+      }
+      return 'r.theme_rapport';
+  }
+
+Fichier: app/Services/DashboardCommissionService.php (527 lignes)
+
+--------------------------------------------------------------------------------
+3.3 Pattern tableExists() / columnExists() avec cache
+--------------------------------------------------------------------------------
+
+Utilise dans 10+ services:
+  - EvaluationSoutenanceService
+  - ProgrammationSoutenanceService
+  - PlanificationSoutenanceService
+  - ProcessusValidationService
+  - EvaluationDossiersService
+  - VerificationRapportsService
+  - DashboardCommissionService
+  - RepertoireEnseignantService
+  - ...
+
+Implementation type:
+  private $tableExistsCache = [];
+  private $columnExistsCache = [];
+
+  private function tableExists(string $tableName): bool {
+      if (array_key_exists($tableName, $this->tableExistsCache)) {
+          return $this->tableExistsCache[$tableName];
+      }
+      try {
+          $stmt = $this->pdo->prepare("SHOW TABLES LIKE ?");
+          $stmt->execute([$tableName]);
+          $exists = (bool) $stmt->fetchColumn();
+          $this->tableExistsCache[$tableName] = $exists;
+          return $exists;
+      } catch (\Throwable $e) {
+          $this->tableExistsCache[$tableName] = false;
+          return false;
+      }
+  }
+
+Note: Ce pattern est duplique dans de nombreux services. Il serait
+      preferable de l'extraire dans un service ou trait commun.
+
+
+================================================================================
+4. PROBLEMES IDENTIFIES
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 CREDENTIALS DB HARDCODES
+--------------------------------------------------------------------------------
+
+Fichier: app/config/database.php
+Lignes: 7-9
+
+Code:
+  private static $host = 'localhost';
+  private static $db = 'ufrmi1802974_2q2mpf';
+  private static $user = 'root';
+  private static $pass = '';
+
+Probleme:
+  - Identifiants root sans mot de passe en dur dans le code
+  - Risque de securite en production
+  - Le fichier est versionne dans le repository
+
+Recommandation:
+  - Utiliser des variables d'environnement (getenv())
+  - Ajouter database.php au .gitignore
+  - Fournir database.php.example avec des valeurs fictives
+
+--------------------------------------------------------------------------------
+4.2 SMTP_PASSWORD EN CLAIR DANS APP_SETTINGS
+--------------------------------------------------------------------------------
+
+Fichier: app/config/email.php (lignes 20-50)
+
+Probleme:
+  - Le mot de passe SMTP est stocke en clair dans app_settings
+  - Le champ is_sensitive est defini mais la valeur n'est pas chiffree
+  - Meme avec is_sensitive=1, le mot de passe est en clair en base
+
+Code:
+  case 'smtp_password':
+      $cfg['smtp']['password'] = $v;  // En clair!
+      break;
+
+Recommandation:
+  - Chiffrer le mot de passe avec une cle derivee
+  - Utiliser un service de secrets (Vault, AWS Secrets Manager)
+  - Au minimum, marquer is_sensitive=1 et masquer dans les logs
+
+--------------------------------------------------------------------------------
+4.3 RATE LIMITER FAIL-OPEN
+--------------------------------------------------------------------------------
+
+Fichier: app/Security/DbRateLimiter.php
+
+Probleme:
+  - En cas d'erreur DB, le rate limiter retourne true (autorise)
+  - Pattern fail-open intentionnel pour ne pas bloquer les utilisateurs
+  - Mais en cas de panne DB, la protection brute force est desactivee
+
+Code type:
+  try {
+      // Verifier le rate limit
+      return $allowed;
+  } catch (Exception $e) {
+      return true;  // Fail-open
+  }
+
+Recommandation:
+  - Documenter ce comportement comme decision architecturale
+  - Considerer un fail-closed en production critique
+  - Ajouter un fallback en memoire (APCu/Redis) pour le rate limiting
+
+--------------------------------------------------------------------------------
+4.4 SESSION WRITE-GATING UNIQUEMENT SUR ANNEE ACTIVE
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/AcademicYear.php
+
+Probleme:
+  - ensureWritableYear() ne verifie que l'annee active
+  - Pas de support pour l'ecriture sur plusieurs annees
+  - Si un admin veut modifier des donnees d'une annee passee,
+    il doit d'abord changer l'annee active (dangereux)
+
+Code:
+  public static function ensureWritableYear(..., ?int $yearId, ...): array {
+      // Verifie seulement si yearId == annee active
+      // Pas de mecanisme multi-annuel
+  }
+
+Recommandation:
+  - Ajouter un mode "archive modifiable" pour les admins
+  - Ou un mecanisme de "session year" distinct de "active year"
+
+--------------------------------------------------------------------------------
+4.5 CSV IMPORT - VERIFICATION DOUBLONS ENSEIGNANTS PAR NOM UNIQUEMENT
+--------------------------------------------------------------------------------
+
+Fichier: app/utils/ExcelImportService.php
+Methode: getOrCreateEnseignant()
+
+Probleme:
+  - La recherche d'enseignant se fait par nom complet seulement
+  - Pas de verification prenom distinct
+  - Risque de creation de doublons si deux enseignants ont le meme nom
+
+Recommandation:
+  - Verifier nom + prenom + email
+  - Afficher un avertissement si doublon potentiel
+
+--------------------------------------------------------------------------------
+4.6 NOTES TABLE - PK num_etu UNIQUEMENT
+--------------------------------------------------------------------------------
+
+Schema: notes.num_carte_etud = PK
+
+Probleme:
+  - Un seul enregistrement de notes par etudiant
+  - Pas de suivi multi-annuel des notes
+  - Si un etudiant recommence une annee, les anciennes notes sont perdues
+
+Recommandation:
+  - Ajouter id_annee_acad a la cle primaire composite
+  - Ou ajouter une colonne id_annee_acad avec index
+
+--------------------------------------------------------------------------------
+4.7 INSCRIPTIONS - CLE COMPOSITE AVEC num_versement
+--------------------------------------------------------------------------------
+
+Schema: inscriptions utilise num_versement dans la cle composite
+
+Probleme:
+  - 3 ou 4 versements typiques, donc 3-4 enregistrements inscription
+  - Un etudiant a plusieurs lignes inscription pour la meme annee
+  - Complexifie les requetes (ORDER BY date_inscription DESC, num_versement DESC)
+
+Code:
+  $stmt = $pdo->prepare("SELECT id_annee_acad FROM inscriptions
+                          WHERE num_carte_etud = ?
+                          ORDER BY date_inscription DESC, num_versement DESC,
+                                   id_inscription DESC LIMIT 1");
+
+Recommandation:
+  - Separer inscription (1 ligne) et versements (plusieurs lignes)
+  - Inscription: etudiant + annee + date
+  - Versements: inscription_id + numero + montant + date
+
+--------------------------------------------------------------------------------
+4.8 CANDIDATURE_SOUTENANCE - AUTO-CREATION POTENTIELLEMENT DUPLICATIVE
+--------------------------------------------------------------------------------
+
+Fichier: app/Services/GestionRapportService.php
+Methode: enregistrerDepotRapport()
+
+Probleme:
+  - Auto-creation de candidature_soutenance lors du depot
+  - Pas de verification d'existence avant creation
+  - Si plusieurs rapports deposes pour le meme etudiant, risque de doublons
+
+Code type:
+  // Si pas de candidature_soutenance existante:
+  // Creation automatique avec statut='En attente'
+  // Pas de verification UNIQUE constraint
+
+Recommandation:
+  - Ajouter une contrainte UNIQUE sur (num_etu, id_annee_acad)
+  - Utiliser INSERT ... ON DUPLICATE KEY UPDATE
+
+
+================================================================================
+5. POINTS DE CONNEXION ENTRE MODULES (VERIFICATION)
+================================================================================
+
+--------------------------------------------------------------------------------
+5.1 FLUX PRINCIPAL: ETUDIANT -> SCOLARITE -> COMMISSION -> SOUTENANCE -> PV
+--------------------------------------------------------------------------------
+
+Verification des connexions:
+
+  Etudiant --[soumet candidature]--> candidature_soutenance
+    ✓ CandidatureSoutenanceService::soumettreCandidature()
+
+  candidature_soutenance --[depose rapport]--> rapport_etudiants
+    ✓ GestionRapportService::enregistrerDepotRapport()
+    ✓ Auto-creation candidature si inexistante
+
+  Scolarite --[verifie]--> approuver (id_approb=4)
+    ✓ VerificationRapportsService::validerRapport()
+
+  Commission --[vote]--> evaluations_rapports
+    ✓ EvaluationDossiersService::evaluerDossier()
+    ✓ ProcessusValidationService::finaliserRapport()
+
+  Commission --[ecrit CR]--> compte_rendu, affecter
+    ✓ RedactionCompteRenduService::enregistrer()
+
+  Commission --[programme]--> programmer_soutenance, enseignant_jury
+    ✓ ProgrammationSoutenanceService::createAttribution()
+
+  Admin --[planifie]--> (salle, date, heure dans programmer_soutenance)
+    ✓ PlanificationSoutenanceService::planifier()
+
+  Jury --[evalue]--> evaluer (5 criteres)
+    ✓ EvaluationSoutenanceService::enregistrerEvaluation()
+
+  Systeme --[genere PV]--> document_genere
+    ✓ PvFinalGeneratorService::generate()
+
+VERIFICATION: Tous les points de connexion sont correctement filés.
+
+--------------------------------------------------------------------------------
+5.2 FLUX PAIEMENT -> INSCRIPTION -> NOTES -> CANDIDATURE
+--------------------------------------------------------------------------------
+
+  Paiement --[enregistre]--> versements
+    ✓ GestionScolariteService::enregistrerVersement()
+
+  versements --[cree]--> inscriptions
+    ✓ InscriptionService::traiterInscription()
+
+  Notes --[enregistre]--> notes
+    ✓ NotesService::enregistrerNotes()
+
+  Candidature --[verifie eligibilite]--> etudiants + inscriptions
+    ✓ CandidatureSoutenanceService::soumettreCandidature()
+    Note: La verification d'eligibilite (notes suffisantes) n'est pas
+          clairement visible. Peut necessiter une amelioration.
+
+VERIFICATION: Flux partiellement verifie. La condition d'eligibilite
+             basee sur les notes devrait etre clarifiee.
+
+--------------------------------------------------------------------------------
+5.3 FLUX CREATION UTILISATEUR -> EMAIL -> RESET PASSWORD
+--------------------------------------------------------------------------------
+
+  Creation utilisateur --[envoi email]--> EmailService
+    ✓ GestionUtilisateurService::addUtilisateur()
+    ✓ EmailService::sendTemplate('USER_WELCOME')
+
+  Reset password --[cree token]--> password_resets
+    ✓ GestionUtilisateurService::createPasswordResetToken()
+
+  Email reset --[envoi]--> EmailService
+    ✓ EmailService::sendTemplate('PASSWORD_RESET')
+
+VERIFICATION: Flux correctement filé. La table password_resets est
+             necessaire mais absente de la documentation du schema.
+
+
+================================================================================
+6. RECOMMANDATIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+6.1 PRIORITE HAUTE - SECURITE
+--------------------------------------------------------------------------------
+
+[1] Deplacer les credentials DB vers des variables d'environnement
+    Fichiers concernes: app/config/database.php
+    Action: Creer .env, utiliser getenv(), ajouter .env au .gitignore
+
+[2] Chiffrer le mot de passe SMTP dans app_settings
+    Fichier: app/config/email.php
+    Action: Implementer chiffrement AES-256-GCM pour les valeurs sensibles
+
+[3] Passer le rate limiter en fail-closed pour la production
+    Fichier: app/Security/DbRateLimiter.php
+    Action: Ajouter configuration fail-open/fail-closed
+
+--------------------------------------------------------------------------------
+6.2 PRIORITE MOYENNE - COHERENCE SCHEMA
+--------------------------------------------------------------------------------
+
+[4] Ajouter la table route_actions a la documentation du schema
+    Referenced: app/Security/RouteActionResolver.php
+
+[5] Documenter la convention dual table names (legacy vs courant)
+    Tables: programmer_soutenance/programmer, composer_jury/enseignant_jury,
+            qualite_jury/roles_jury
+    Action: Creer un document SCHEMA_MAPPING.md
+
+[6] Ajouter une contrainte UNIQUE sur candidature_soutenance
+    Cle: (num_etu, id_annee_acad)
+    Action: ALTER TABLE candidature_soutenance ADD UNIQUE KEY ...
+
+[7] Ajouter id_annee_acad a la PK de la table notes
+    Pour support multi-annuel
+    Action: Modifier la PK composite
+
+[8] Documenter les tables password_resets, document_genere, rendre,
+    commission_evaluation, statut_reclamation, type_reclamation
+
+--------------------------------------------------------------------------------
+6.3 PRIORITE BASSE - QUALITE DU CODE
+--------------------------------------------------------------------------------
+
+[9] Extraire le pattern tableExists()/columnExists() dans un trait ou service
+    Services concernes: 10+
+    Action: Creer SchemaAwareTrait ou SchemaHelper
+
+[10] Clarifier les conditions d'eligibilite pour la candidature
+     Action: Documenter ou implementer la verification des notes minimales
+
+[11] Ameliorer la verification des doublons dans ExcelImportService
+     Action: Verifier nom + prenom + email pour les enseignants
+
+[12] Separer inscriptions et versements dans le schema
+     Actuellement: inscriptions contient les versements (PK composite)
+     Recommande: inscriptions (1) -- (N) versements
+
+
+================================================================================
+TABLEAU RECAPITULATIF DES PROBLEMES
+================================================================================
+
+┌────┬──────────────────────────────────────────┬────────┬──────────────┐
+│ #  │ Probleme                                 │Priorite│ Impact       │
+├────┼──────────────────────────────────────────┼────────┼──────────────┤
+│ 1  │ Credentials DB hardcodes                 │ HAUTE  │ Securite     │
+│ 2  │ SMTP password en clair                   │ HAUTE  │ Securite     │
+│ 3  │ Rate limiter fail-open                   │ HAUTE  │ Securite     │
+│ 4  │ Write-gating annee unique                │ MOYEN  │ Fonctionnel  │
+│ 5  │ CSV import doublons enseignants          │ MOYEN  │ Donnees      │
+│ 6  │ Notes PK non multi-annuelle              │ MOYEN  │ Donnees      │
+│ 7  │ Inscriptions PK composite                │ MOYEN  │ Architecture │
+│ 8  │ Candidature auto-creation duplicative    │ MOYEN  │ Donnees      │
+│ 9  │ Pattern tableExists() duplique           │ BASSE  │ Maintenance  │
+│ 10 │ Eligibilite candidature non verifiee     │ BASSE  │ Fonctionnel  │
+│ 11 │ Tables non documentees                   │ BASSE  │ Documentation│
+│ 12 │ niveau_approbation non utilise           │ BASSE  │ Fonctionnel  │
+└────┴──────────────────────────────────────────┴────────┴──────────────┘
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

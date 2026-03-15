@@ -1,0 +1,639 @@
+================================================================================
+  PARCOURS UTILISATEUR - ENSEIGNANT (GROUPE 12)
+  Documentation technique complète du flux utilisateur enseignant
+  Application CheckMaster - UFR MI / MIAGE - UFHB-CI
+================================================================================
+
+TABLE DES MATIÈRES
+==================
+1.  Connexion et authentification
+2.  Tableau de bord enseignant (page=dashboard_enseignant)
+3.  Répertoire documents (page=repertoire_enseignant)
+4.  Programmation enseignant (page=programmation_ens)
+5.  Rédaction compte rendu (page=redaction_compte_rendu)
+6.  Profil et changement de mot de passe
+7.  Tables de la base de données utilisées
+8.  Données de session
+9.  Vérifications de permissions
+10. Flux de données et interactions
+
+================================================================================
+1. CONNEXION ET AUTHENTIFICATION
+================================================================================
+
+Controller : AuthController
+Service    : CheckMaster\Services\AuthService
+Méthode    : login($login, $password, $ip)
+
+Flux de connexion pour un enseignant (id_GU = 12) :
+
+  1. L'utilisateur saisit son login et mot de passe sur la page de connexion
+     (page_connexion.php).
+     
+  2. AuthController::login() reçoit les identifiants et délègue à
+     AuthService::login($login, $password, $ip).
+     
+  3. AuthService effectue les étapes suivantes :
+     
+     a) Vérification du rate limiter (DbRateLimiter) :
+        - Si l'IP est verrouillée, retourne un message d'erreur.
+        - Mécanisme de protection contre le brute force (5 tentatives,
+          verrouillage 15 minutes, reset après 10 minutes).
+     
+     b) Appel à Utilisateur::verifierConnexion($login, $password) :
+        - Recherche dans la table 'utilisateurs' par login_utilisateur.
+        - Vérifie le hash du mot de passe avec password_verify().
+        - Vérifie que statut_utilisateur = 'Actif'.
+        - Retourne les informations utilisateur si authentification réussie.
+     
+     c) En cas de succès, peuplement de $_SESSION :
+     
+        Variables de session générales :
+        ┌─────────────────────────┬──────────────────────────────────────┐
+        │ Variable de session     │ Source                               │
+        ├─────────────────────────┼──────────────────────────────────────┤
+        │ id_utilisateur          │ utilisateurs.id_utilisateur          │
+        │ nom_utilisateur         │ utilisateurs.nom_utilisateur         │
+        │ statut_utilisateur      │ utilisateurs.statut_utilisateur      │
+        │ login_utilisateur       │ utilisateurs.login_utilisateur       │
+        │ type_utilisateur        │ libellé depuis type_utilisateur      │
+        │ id_GU                   │ utilisateurs.id_GU = 12              │
+        │ lib_GU                  │ libellé groupe_utilisateur           │
+        │ niveau_acces            │ libellé niveau_acces_donnees         │
+        └─────────────────────────┴──────────────────────────────────────┘
+     
+     d) Pour les enseignants (type_utilisateur = 'Enseignant simple' ou
+        'Enseignant administratif'), chargement des données spécifiques via
+        Enseignant::getEnseignantByLogin() :
+     
+        Variables de session spécifiques à l'enseignant :
+        ┌─────────────────────────┬──────────────────────────────────────┐
+        │ Variable de session     │ Source (requête jointe)              │
+        ├─────────────────────────┼──────────────────────────────────────┤
+        │ specialite              │ enseignants → specialite             │
+        │                         │ (via table avoir)                    │
+        │ grade                   │ enseignants → grade                  │
+        │                         │ (via table avoir→grade table)        │
+        │ fonction                │ enseignants → fonction               │
+        │                         │ (via occuper)                        │
+        │ date_grade              │ avoir.date_grade                     │
+        │ date_fonction           │ avoir.date_occupation                │
+        └─────────────────────────┴──────────────────────────────────────┘
+     
+     e) Enregistrement dans la piste d'audit :
+        - AuditLog::logConnexion(id_utilisateur, 'utilisateur', 'Succès')
+     
+     f) Réinitialisation du rate limiter pour l'IP/identifiant.
+     
+     g) Retour ['success' => true].
+     
+  4. En cas d'échec :
+     - Appel à DbRateLimiter::hit() pour incrémenter le compteur.
+     - Retour ['success' => false, 'message' => 'Identifiants incorrects.'].
+
+Déconnexion :
+  AuthService::logout($idUtilisateur) :
+    - AuditLog::logDeconnexion() pour tracer la déconnexion.
+    - Vidage de $_SESSION.
+    - Suppression du cookie de session.
+    - session_destroy().
+
+================================================================================
+2. TABLEAU DE BORD ENSEIGNANT (page=dashboard_enseignant)
+================================================================================
+
+Controller : DashboardEnseignantController
+Service    : CheckMaster\Services\DashboardEnseignantService
+Méthode    : index() → populateDashboardGlobals()
+
+Description :
+  Cette page affiche les statistiques personnelles de l'enseignant
+  connecté, notamment les niveaux d'étude qu'il gère et le nombre
+  d'étudiants inscrits dans ces niveaux.
+
+Flux d'exécution :
+
+  DashboardEnseignantController::index()
+    │
+    ├─ Récupère $_SESSION['login_utilisateur']
+    │
+    └─ Appelle DashboardEnseignantService::populateDashboardGlobals()
+         │
+         ├─ getGlobalStats($loginUtilisateur)
+         │    │
+         │    ├─ Enseignant::getEnseignantByLogin($login)
+         │    │   → Récupère l'objet enseignant avec id_enseignant
+         │    │
+         │    ├─ getNiveauxByEnseignant($enseignantId)
+         │    │   → SELECT * FROM niveau_etude WHERE id_enseignant = ?
+         │    │   → Retourne la liste des niveaux gérés par l'enseignant
+         │    │
+         │    ├─ getEtudiantsByNiveaux($niveauIds)
+         │    │   → Récupère tous les étudiants inscrits (via la table
+         │    │     inscriptions) filtrés par niveaux d'étude
+         │    │   → Utilise Etudiant::getAllListeEtudiants($selectedYearId)
+         │    │   → Filtre les doublons par num_carte_etud
+         │    │   → Retourne un tableau associatif indexé par num_carte_etud
+         │    │
+         │    └─ buildMesNiveauxStats($niveaux, $etudiants)
+         │        → Construit un tableau avec le nombre d'étudiants par niveau
+         │        → Chaque entrée contient : nom, niveau, nombre_etudiants
+         │
+         └─ Injection dans $GLOBALS :
+              $GLOBALS['total_etudiants'] = nombre total d'étudiants
+              $GLOBALS['total_ues']      = nombre total de niveaux gérés
+              $GLOBALS['total_ecues']    = 0 (non utilisé)
+              $GLOBALS['mes_cours']      = tableau des niveaux avec stats
+
+Affichage de la vue :
+  La vue accède aux données via $GLOBALS :
+  - Card "Total Étudiants" : affiche total_etudiants
+  - Card "Total UE/ECUE"   : affiche total_ues
+  - Liste "Mes Cours/Niveaux" : itère sur mes_cours
+    → Pour chaque niveau : nom du niveau + nombre d'étudiants
+
+Tables utilisées :
+  - enseignants       : identification de l'enseignant par login
+  - niveau_etude      : niveaux d'étude gérés (WHERE id_enseignant)
+  - inscriptions      : étudiants inscrits (pour filtrer par année)
+  - etudiants         : informations étudiants
+
+Année académique :
+  - Utilise AcademicYear::getSelectedIdFromSession() pour filtrer
+    les étudiants inscrits sur l'année sélectionnée.
+
+================================================================================
+3. RÉPERTOIRE DOCUMENTS (page=repertoire_enseignant)
+================================================================================
+
+Service : CheckMaster\Services\RepertoireEnseignantService
+Méthode : index()
+
+Description :
+  Cette page permet à l'enseignant de consulter les documents auxquels
+  il est associé : rapports, comptes rendus et mémoires. La page est
+  organisée en 3 onglets avec des statistiques pour chacun.
+
+Identification de l'enseignant :
+  - Récupération de l'enseignant via Enseignant::getEnseignantByLogin()
+  - Extraction de id_enseignant et nom complet
+  - Récupération des filtres : année académique, session, recherche textuelle
+
+Compteurs des onglets (getTabCounts) :
+  ┌──────────────────┬──────────────────────────────────────────────────┐
+  │ Onglet           │ Logique de comptage                             │
+  ├──────────────────┼──────────────────────────────────────────────────┤
+  │ Rapports         │ COUNT(DISTINCT r.id_rapport)                    │
+  │                  │ FROM affecter a                                 │
+  │                  │ JOIN rapport_etudiants r ON r.id_rapport         │
+  │                  │ WHERE a.id_enseignant = ?                       │
+  ├──────────────────┼──────────────────────────────────────────────────┤
+  │ Comptes Rendus   │ COUNT(DISTINCT cr.id_CR)                        │
+  │                  │ FROM compte_rendu cr                            │
+  │                  │ LEFT JOIN affecter a ON a.id_rapport             │
+  │                  │ LEFT JOIN rendre rd ON rd.id_CR                  │
+  │                  │ WHERE a.id_enseignant = ? OR rd.id_enseignant=?  │
+  ├──────────────────┼──────────────────────────────────────────────────┤
+  │ Mémoires         │ COUNT(DISTINCT ps.num_soutenance)                │
+  │                  │ FROM programmer_soutenance ps                    │
+  │                  │ WHERE EXISTS (enseignant_jury)                   │
+  │                  │ OR EXISTS (affecter avec role encadrant/direct.) │
+  └──────────────────┴──────────────────────────────────────────────────┘
+
+3.1 Onglet "Rapports" (getRapports)
+
+Requête SQL principale :
+  SELECT r.id_rapport, r.theme_rapport, r.statut_rapport,
+         r.date_redaction_rapport, r.chemin_fichier,
+         e.num_carte_etud, e.nom_etu, e.prenom_etu,
+         CONCAT(YEAR(aa.date_deb), '-', YEAR(aa.date_fin)) AS annee_academique,
+         s.lib_session
+  FROM affecter a
+  JOIN rapport_etudiants r ON r.id_rapport = a.id_rapport
+  JOIN etudiants e ON e.num_carte_etud = r.num_etu
+  LEFT JOIN inscriptions i ON i.num_carte_etud = e.num_carte_etud
+  LEFT JOIN annee_academique aa ON aa.id_annee_acad = i.id_annee_acad
+  LEFT JOIN programmer_soutenance ps ON ps.num_etud = e.num_carte_etud
+  LEFT JOIN session s ON s.id_session = ps.id_session
+  WHERE a.id_enseignant = :id_enseignant
+  [AND i.id_annee_acad = :id_annee_acad]
+  [AND ps.id_session = :id_session]
+  [AND (r.theme_rapport LIKE ... OR e.nom_etu LIKE ...)]
+  ORDER BY r.date_redaction_rapport DESC
+  LIMIT :limit OFFSET :offset
+
+Pagination :
+  - 15 éléments par page
+  - Paramètre URL : page_num (défaut: 1)
+  - Navigation : has_prev, has_next, current, last, pages[]
+
+3.2 Onglet "Comptes Rendus" (getComptesRendus)
+
+Requête SQL principale :
+  SELECT DISTINCT cr.id_CR, cr.nom_CR, cr.date_CR,
+         cr.chemin_fichier_pdf, e.num_carte_etud, e.nom_etu, e.prenom_etu
+  FROM compte_rendu cr
+  LEFT JOIN compte_rendu_rapport crr ON crr.id_CR = cr.id_CR
+  LEFT JOIN rapport_etudiants r ON r.id_rapport = crr.id_rapport
+  LEFT JOIN etudiants e ON e.num_carte_etud = COALESCE(r.num_etu, cr.num_etu)
+  LEFT JOIN affecter a ON a.id_rapport = r.id_rapport
+  LEFT JOIN rendre rd ON rd.id_CR = cr.id_CR
+  WHERE (a.id_enseignant = :id_enseignant OR rd.id_enseignant = :id_enseignant)
+  ORDER BY cr.date_CR DESC
+
+Logique d'accès :
+  - Via la table 'affecter' (si enseignant est encadrant/directeur d'un
+    rapport inclus dans le CR)
+  - Via la table 'rendre' (si enseignant est l'auteur du CR)
+
+3.3 Onglet "Mémoires" (getMemoires)
+
+Requête SQL principale :
+  SELECT ps.num_soutenance, ps.theme_soutenance, ps.date_soutenance,
+         ps.heure_soutenance, e.num_carte_etud, e.nom_etu, e.prenom_etu,
+         s.lib_session, SUM(COALESCE(ev.note, 0)) AS note_memoire
+  FROM programmer_soutenance ps
+  JOIN etudiants e ON e.num_carte_etud = ps.num_etud
+  LEFT JOIN session s ON s.id_session = ps.id_session
+  LEFT JOIN evaluer ev ON ev.num_etudiant = ps.num_etud
+  WHERE EXISTS (enseignant_jury WHERE id_enseignant = :id)
+     OR EXISTS (affecter WHERE id_enseignant = :id AND role IN ('encadrant','directeur'))
+
+Logique d'accès :
+  - Via la table 'enseignant_jury' (enseignant membre du jury)
+  - Via la table 'affecter' (enseignant encadrant ou directeur)
+
+Distribution des rôles jury (getQualitesJury) :
+  → Récupère la répartition des rôles de l'enseignant dans les jurys
+  → Table qualite_jury pour les libellés (EN/EX/DM/PJ/MS)
+  → GROUP BY id_role_jury, lib_role avec COUNT(DISTINCT num_soutenance)
+
+Statistiques par enseignant (getStatsEnseignantsJury) :
+  → Pour chaque enseignant : nombre de soutenances en jury,
+    nombre encadrées, nombre dirigées
+
+Tables utilisées dans ce module :
+  - affecter              : liaison enseignant-rapport (rôle encadrant/directeur)
+  - rapport_etudiants     : rapports des étudiants
+  - compte_rendu          : comptes rendus rédigés
+  - compte_rendu_rapport  : pivot CR-rapports
+  - rendre                : qui a rédigé quel CR
+  - enseignant_jury       : composition des jurys de soutenance
+  - programmer_soutenance : programmation des soutenances
+  - qualite_jury          : rôles dans le jury (président, examinateur, etc.)
+  - etudiants             : informations étudiants
+  - inscriptions          : inscriptions académiques
+  - annee_academique      : années académiques
+  - session               : sessions (ordinaire, rattrapage)
+  - evaluer               : évaluations des soutenances
+
+================================================================================
+4. PROGRAMMATION ENSEIGNANT (page=programmation_ens)
+================================================================================
+
+Service : CheckMaster\Services\ProgrammationSoutenanceService
+Usage   : Vue en lecture seule pour l'enseignant (pas de modification)
+
+Description :
+  Cette page affiche les soutenances auxquelles l'enseignant est affecté
+  en tant que membre du jury, avec son rôle spécifique.
+
+Données affichées pour l'enseignant :
+  - Liste des soutenances où il apparaît dans enseignant_jury
+  - Pour chaque soutenance :
+    - Thème du mémoire
+    - Date et heure
+    - Salle
+    - Nom de l'étudiant
+    - Rôle du jury (EN = Encadrant, EX = Examinateur, DM = Directeur Mémoire,
+      PJ = Président du Jury, MS = Maître de Stage)
+
+Tables utilisées :
+  - programmer_soutenance  : programmation des soutenances
+  - enseignant_jury        : composition des jurys (id_enseignant, num_soutenance)
+  - qualite_jury           : libellé du rôle (lib_role)
+  - salles                 : informations sur la salle
+  - etudiants              : nom/prénom de l'étudiant
+
+Accès :
+  - Lecture seule, aucune vérification de permission spéciale
+  - Les données sont filtrées par l'id_enseignant de la session
+
+================================================================================
+5. RÉDACTION COMPTE RENDU (page=redaction_compte_rendu)
+================================================================================
+
+Controller : RedactionCompteRenduController
+Service    : CheckMaster\Services\RedactionCompteRenduService
+
+5.1 Affichage du formulaire (index)
+
+RedactionCompteRenduController::index()
+  │
+  └─ RedactionCompteRenduService::getIndexData()
+       │
+       ├─ getRapportsValidesForSelectedYear()
+       │   → Récupère les rapports avec décision de validation
+       │   → Jointure sur la table 'valider' pour obtenir la dernière décision
+       │   → Filtre : v2.decision_validation IN ('valider', 'rejeter')
+       │   → Exclut les rapports déjà liés à un CR (compte_rendu_rapport)
+       │
+       └─ Enseignant::getAllEnseignants()
+           → Liste tous les enseignants pour les menus déroulants
+             encadrant/directeur
+
+Variables injectées dans $GLOBALS :
+  - $GLOBALS['rapports_valides'] : liste des rapports validés disponibles
+  - $GLOBALS['enseignants']      : liste des enseignants pour affectation
+
+5.2 Enregistrement d'un compte rendu (enregistrer)
+
+Vérification de permission :
+  if (!canCreate('redaction_compte_rendu') && !canEdit('redaction_compte_rendu'))
+    → Retourne 403 en AJAX ou redirige vers access_denied
+
+Flux complet d'enregistrement :
+
+  RedactionCompteRenduController::enregistrer()
+    │
+    └─ RedactionCompteRenduService::enregistrer($data)
+         │
+         ├─ 1. Validation des données
+         │   → Vérifie qu'un étudiant est sélectionné (num_etu non vide)
+         │   → Vérifie que le nom CR est fourni
+         │
+         ├─ 2. Vérification année académique (AcademicYear::ensureWritableYear)
+         │   → Empêche l'écriture si l'année est clôturée
+         │
+         ├─ 3. Génération du PDF (PdfGeneratorService / TCPDF)
+         │   → Convertit le contenu HTML en PDF
+         │   → Enveloppe le contenu dans une structure HTML complète
+         │   → Sauvegarde dans ressources/uploads/comptes_rendus/
+         │   → Nom du fichier : CR_YYYYMMDD_HHMMSS.pdf
+         │
+         ├─ 4. Enregistrement en base de données
+         │   → CompteRendu::creer() insère dans la table compte_rendu
+         │   → Champs : num_etu, nom_CR, contenu_CR, chemin_fichier_pdf, date_CR
+         │   → Insertion dans compte_rendu_rapport pour chaque rapport sélectionné
+         │
+         ├─ 5. Affectations (saveAffectations)
+         │   → Pour chaque rapport lié au CR :
+         │     - INSERT INTO affecter (id_enseignant, id_rapport, role)
+         │       VALUES (?, ?, 'encadrant')  [si encadrant sélectionné]
+         │     - INSERT INTO affecter (id_enseignant, id_rapport, role)
+         │       VALUES (?, ?, 'directeur')  [si directeur sélectionné]
+         │
+         └─ 6. Envoi des emails (sendNotificationEmails)
+             → Pour chaque rapport :
+               - Récupère l'email de l'étudiant via RapportEtudiant::getRapportById()
+               - Envoie via EmailService::sendTemplate('REPORT_NOTIFICATION')
+               - Pièce jointe : le PDF du CR généré
+
+Données POST attendues :
+  ┌──────────────────────────┬──────────────────────────────────────────┐
+  │ Champ                    │ Description                              │
+  ├──────────────────────────┼──────────────────────────────────────────┤
+  │ num_etu                  │ Numéro carte étudiant                    │
+  │ nom_CR                   │ Nom/titre du compte rendu                │
+  │ contenu_CR               │ Contenu HTML du CR (éditeur riche)       │
+  │ rapports[]               │ Tableau des ID de rapports sélectionnés  │
+  │ encadrant_pedagogique[]  │ ID encadrant par rapport                 │
+  │ directeur_memoire[]      │ ID directeur par rapport                 │
+  └──────────────────────────┴──────────────────────────────────────────┘
+
+Réponse :
+  - AJAX : JSON { success, message, redirect }
+  - POST classique : redirection vers ?page=redaction_compte_rendu
+
+5.3 Export PDF (exporterPDF)
+
+RedactionCompteRenduController::exporterPDF()
+  → Génère un PDF temporaire à partir du contenu HTML
+  → Retourne le PDF directement (Content-Type: application/pdf)
+  → Utilise PdfGeneratorService (TCPDF) avec logo de l'université
+
+Tables utilisées :
+  - compte_rendu         : enregistrement du CR
+  - compte_rendu_rapport : pivot CR-rapports
+  - rapport_etudiants    : rapports des étudiants
+  - valider              : décisions de validation des rapports
+  - affecter             : affectation encadrant/directeur
+  - enseignants          : liste des enseignants
+  - etudiants            : informations étudiants
+  - inscriptions         : pour filtrer par année académique
+
+================================================================================
+6. PROFIL ET CHANGEMENT DE MOT DE PASSE
+================================================================================
+
+Controller : AuthController
+Service    : CheckMaster\Services\AuthService
+Méthode    : updatePassword($idUtilisateur, $currentPassword, $newPassword, $confirmPassword)
+
+Flux :
+  AuthController::updatePassword($current, $new, $confirm)
+    │
+    └─ AuthService::updatePassword(...)
+         │
+         ├─ 1. Validation de la session (idUtilisateur > 0)
+         │
+         ├─ 2. Vérification que tous les champs sont remplis
+         │
+         ├─ 3. Récupération de l'utilisateur depuis la BD
+         │   → Utilisateur::getUtilisateurById($idUtilisateur)
+         │
+         ├─ 4. Vérification du mot de passe actuel
+         │   → password_verify() ou hash_equals()
+         │
+         ├─ 5. Vérification que nouveau == confirmation
+         │
+         ├─ 6. Vérification que le nouveau est différent de l'ancien
+         │
+         ├─ 7. Règles de complexité :
+         │   - Minimum 8 caractères
+         │   - Au moins 1 majuscule [A-Z]
+         │   - Au moins 1 chiffre [0-9]
+         │   - Au moins 1 caractère spécial [!@#$%^&*...]
+         │
+         ├─ 8. Hashage avec password_hash(PASSWORD_DEFAULT)
+         │
+         └─ 9. Mise à jour : Utilisateur::updatePassword()
+
+Messages d'erreur possibles :
+  - "Session utilisateur invalide. Veuillez vous reconnecter."
+  - "Tous les champs mot de passe sont obligatoires."
+  - "Utilisateur introuvable."
+  - "Le mot de passe actuel est incorrect."
+  - "Les mots de passe ne correspondent pas."
+  - "Le nouveau mot de passe doit être différent de l'ancien."
+  - "Le mot de passe doit contenir au moins 8 caractères."
+  - "Le mot de passe doit contenir au moins une majuscule."
+  - "Le mot de passe doit contenir au moins un chiffre."
+  - "Le mot de passe doit contenir au moins un caractère spécial."
+  - "Erreur lors de la mise à jour du mot de passe."
+
+Audit :
+  - Toute tentative (succès ou échec) est enregistrée dans la piste d'audit
+  - AuditLog::logModification($idUtilisateur, 'utilisateur', 'Succès|Erreur')
+
+================================================================================
+7. TABLES DE LA BASE DE DONNÉES UTILISÉES
+================================================================================
+
+┌─────────────────────────┬─────────────────────────────────────────────────┐
+│ Table                   │ Rôle dans le parcours enseignant                │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ utilisateurs            │ Compte d'authentification, rattachement au      │
+│                         │ groupe utilisateur (id_GU=12)                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ enseignants             │ Informations personnelles de l'enseignant       │
+│                         │ (nom, prénom, mail_enseignant)                  │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ avoir                   │ Liaison enseignant-grade avec date d'obtention  │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ grade                   │ Grades académiques (AS, MA, MC, PT)             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ specialite              │ Spécialités d'enseignement                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ occuper                 │ Liaison enseignant-fonction                     │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ fonction                │ Fonctions occupées                              │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ affecter                │ Affectation enseignant-rapport (encadrant/       │
+│                         │ directeur)                                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ rapport_etudiants       │ Rapports des étudiants (thème, statut, fichier) │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ compte_rendu            │ Comptes rendus rédigés                          │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ compte_rendu_rapport    │ Pivot CR ↔ rapports (un CR peut contenir        │
+│                         │ plusieurs rapports)                             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ rendre                  │ Qui a rédigé quel CR                            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ valider                 │ Décisions de validation des rapports            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ enseignant_jury         │ Composition des jurys de soutenance             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ programmer_soutenance   │ Programmation des soutenances                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ qualite_jury            │ Rôles dans le jury (président, examinateur...)  │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_etude            │ Niveaux d'étude gérés par l'enseignant          │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ etudiants               │ Informations des étudiants                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ inscriptions            │ Inscriptions académiques (filtrage par année)   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ annee_academique        │ Années académiques                              │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ session                 │ Sessions (ordinaire, rattrapage)                │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ evaluer                 │ Évaluations des soutenances (notes)             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ audit_log               │ Piste d'audit des connexions et modifications   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ groupe_utilisateur      │ Groupes (id=12 pour enseignant)                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ type_utilisateur        │ Types d'utilisateurs                            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_acces_donnees    │ Niveaux d'accès aux données                     │
+└─────────────────────────┴─────────────────────────────────────────────────┘
+
+================================================================================
+8. DONNÉES DE SESSION
+================================================================================
+
+Variables de session disponibles pour l'enseignant :
+
+┌───────────────────────────┬──────────────────────────────────────────────┐
+│ Variable                  │ Description                                  │
+├───────────────────────────┼──────────────────────────────────────────────┤
+│ id_utilisateur            │ ID unique de l'utilisateur dans le système   │
+│ nom_utilisateur           │ Nom d'affichage / login                      │
+│ statut_utilisateur        │ 'Actif' ou 'Inactif'                         │
+│ login_utilisateur         │ Login utilisé pour la connexion              │
+│ type_utilisateur          │ 'Enseignant simple' / 'Enseignant admin.'    │
+│ id_GU                     │ 12 (Groupe Utilisateur Enseignant)           │
+│ lib_GU                    │ Libellé du groupe (ex: 'Enseignant')         │
+│ niveau_acces              │ Niveau d'accès aux données                   │
+│ specialite                │ Spécialité de l'enseignant                   │
+│ grade                     │ Grade académique (AS, MA, MC, PT)            │
+│ fonction                  │ Fonction occupée                             │
+│ date_grade                │ Date d'obtention du grade                    │
+│ date_fonction             │ Date de prise de fonction                    │
+│ archive_annee_acad        │ Année sélectionnée (si archive)              │
+│ archive_annee_libelle     │ Libellé année (si archive)                   │
+└───────────────────────────┴──────────────────────────────────────────────┘
+
+================================================================================
+9. VÉRIFICATIONS DE PERMISSIONS
+================================================================================
+
+Le système utilise un modèle RBAC (Role-Based Access Control) basé sur les
+groupes d'utilisateurs et les permissions associées.
+
+Fonctions de vérification (utils/permissions_helper.php) :
+  - canView($traitement)    : peut consulter la page
+  - canCreate($traitement)  : peut créer de nouvelles données
+  - canEdit($traitement)    : peut modifier des données existantes
+  - canDelete($traitement)  : peut supprimer des données
+
+Pages du parcours enseignant et leurs permissions :
+
+┌─────────────────────────────┬─────────────┬─────────────┬─────────────┐
+│ Page                        │ canView     │ canCreate   │ canEdit     │
+├─────────────────────────────┼─────────────┼─────────────┼─────────────┤
+│ dashboard_enseignant        │ implicit    │ N/A         │ N/A         │
+│ repertoire_enseignant       │ implicit    │ N/A         │ N/A         │
+│ programmation_ens           │ implicit    │ N/A         │ N/A         │
+│ redaction_compte_rendu      │ implicit    │ OUI         │ OUI         │
+│ profil (mot de passe)       │ implicit    │ N/A         │ N/A         │
+└─────────────────────────────┴─────────────┴─────────────┴─────────────┘
+
+Notes :
+  - Les pages dashboard et repertoire sont accessibles par défaut aux
+    enseignants (pas de vérification explicite dans le code).
+  - La rédaction de CR nécessite canCreate('redaction_compte_rendu') ou
+    canEdit('redaction_compte_rendu').
+  - Le changement de mot de passe n'a pas de vérification de permission
+    spécifique (tout utilisateur connecté peut le faire).
+
+================================================================================
+10. FLUX DE DONNÉES ET INTERACTIONS
+================================================================================
+
+Résumé des interactions principales :
+
+1. Connexion → Dashboard :
+   AuthService::login() → session peuplée →
+   DashboardEnseignantController::index() →
+   DashboardEnseignantService::populateDashboardGlobals() →
+   Vue dashboard_enseignant
+
+2. Dashboard → Répertoire Documents :
+   Lien navigation → RepertoireEnseignantService::index() →
+   Requêtes SQL multi-onglets → $GLOBALS['repertoire_data'] →
+   Vue repertoire_enseignant
+
+3. Répertoire → Rédaction CR :
+   Lien navigation → RedactionCompteRenduController::index() →
+   RedactionCompteRenduService::getIndexData() →
+   Formulaire HTML + Éditeur riche → POST enregistrer →
+   PdfGeneratorService::createDocument() → fichier PDF →
+   CompteRendu::creer() + saveAffectations() →
+   EmailService::sendTemplate() → succès
+
+4. Vue Programmation :
+   Lien navigation → ProgrammationSoutenanceService (lecture seule) →
+   Requête SQL filtrée par id_enseignant dans enseignant_jury →
+   Affichage des rôles jury (EN/EX/DM/PJ/MS)
+
+5. Profil :
+   Lien navigation → Formulaire changement mot de passe →
+   AuthService::updatePassword() → validation → password_hash() →
+   Utilisateur::updatePassword() → AuditLog::logModification()
+
+================================================================================
+FIN DE DOCUMENTATION
+================================================================================

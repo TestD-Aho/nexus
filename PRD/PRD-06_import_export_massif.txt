@@ -1,0 +1,159 @@
+# PRD-06 - Import/Export massif avec league/csv
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-03, PRD-04, PRD-05
+- Composants imposes: `league/csv`, `symfony/string`, `nesbot/carbon`
+
+## Resume executif
+Ce PRD refond les traitements massifs d'import/export pour fiabiliser les flux de donnees (notamment scolarite, etudiants, archives) avec pipeline de validation robuste, lecture/streaming CSV et journal d'execution complet.
+
+## Objectifs
+1. Fiabiliser les imports en masse sans corruption metier.
+2. Uniformiser les exports CSV des listes critiques.
+3. Supporter de gros volumes en streaming.
+4. Rendre les erreurs d'import explicites et actionnables.
+
+## Contraintes non negociables
+1. Aucun changement schema BDD.
+2. Validation stricte avant toute ecriture.
+3. Transactions controlees et rollback sur anomalies critiques.
+4. Compatibilite avec formats actuellement utilises.
+
+## Flux cibles
+- Import etudiants / inscriptions
+- Export listes scolarite
+- Export rapports / evaluations / archives
+- Export synthese dashboard metier
+
+## Composants a implementer
+- `app\ImportExport\CsvReaderFactory.php` (`league/csv`)
+- `app\ImportExport\CsvWriterFactory.php`
+- `app\ImportExport\ImportPipeline.php`
+- `app\ImportExport\ExportPipeline.php`
+- `app\ImportExport\ImportErrorReport.php`
+- `app\ImportExport\Mapping\*`
+
+## Pipeline d'import (detail)
+1. Upload/lecture flux CSV.
+2. Validation du schema de colonnes.
+3. Normalisation texte (`symfony/string`).
+4. Parsing dates (`Carbon`).
+5. Validation metier (`ValidationEngine`, PRD-04).
+6. Batch ecriture via repositories.
+7. Rapport final (succes/erreurs ligne par ligne).
+
+## Pipeline d'export (detail)
+1. Filtrage metier (annee, niveau, statut, role).
+2. Recuperation repository paginee.
+3. Ecriture streaming CSV.
+4. Journalisation audit d'export.
+
+## Exigences fonctionnelles (FR)
+- FR-06-01: previsualisation du mapping colonnes avant import.
+- FR-06-02: mode simulation (dry-run) sans ecriture DB.
+- FR-06-03: rapport erreurs par ligne et colonne.
+- FR-06-04: export filtrable par annee academique.
+- FR-06-05: export encodage UTF-8 stable.
+
+## Exigences techniques (NFR)
+- NFR-06-01: traitement par chunks pour grands fichiers.
+- NFR-06-02: idempotence configurable pour imports.
+- NFR-06-03: timeout maitrises et reprise possible.
+- NFR-06-04: logs operationnels exploitables.
+
+## Tables concernees (sans changement schema)
+- Imports: `etudiants`, `inscriptions`, `utilisateur`, `personnel_admin`, `enseignants`
+- Exports: `rapport_etudiants`, `candidature_soutenance`, `valider`, `programmer_soutenance`, `notes`, `reclamations`
+- Audit execution: `pister`
+
+## Contrats exemples
+```php
+final class ImportPipeline {
+    public function run(ImportJobInput $job): ImportJobResult;
+}
+
+final class ExportPipeline {
+    public function stream(ExportJobInput $job): StreamedResponse;
+}
+```
+
+## Modules impactes
+- Services: `ExcelImportService` (refonte), `GestionEtudiantService`, `GestionScolariteService`, `Archive*Service`.
+- Controllers: ecrans d'import/export admin/scolarite/archives.
+- Repositories: student, inscription, archive, rapport.
+
+## Plan d'implementation
+1. Introduire librairie `league/csv` et wrappers.
+2. Migrer un flux pilote (import etudiants).
+3. Migrer exports majeurs (scolarite + archives).
+4. Generaliser pipeline sur autres flux.
+5. Ajouter monitoring et documentation operative.
+
+## Strategie de test
+- Tests unitaires mapping CSV -> DTO.
+- Tests integration import dry-run et commit.
+- Tests volumetriques (fichiers volumineux).
+- Tests de non regression des exports existants.
+
+## Criteres d'acceptation
+- Imports robustes avec rapport d'erreurs detaille.
+- Exports stables et performants.
+- Aucune ecriture hors validation.
+- Aucun changement schema BDD.
+
+## Risques et mitigations
+- Risque: qualite variable des fichiers source.  
+  Mitigation: mode dry-run + prevalidation stricte.
+- Risque: import partiel incoherent.  
+  Mitigation: transactions par lot et resume d'etat.
+- Risque: surconsommation memoire.  
+  Mitigation: streaming/chunking obligatoire.
+
+## Definition of done
+- Nouveau pipeline import/export en production sur flux prioritaires.
+- Documentation utilisateur + technique finalisee.
+
+## Annexe detaillee F - specifications de formats et pilotage operationnel import/export
+
+### Schema CSV de reference (import etudiants)
+| Colonne | Type | Obligatoire | Regle |
+|---|---|---|---|
+| num_carte_etud | string | oui | unique metier |
+| nom_etu | string | oui | longueur 2..100 |
+| prenom_etu | string | oui | longueur 2..150 |
+| email_etu | string | non | email valide |
+| promotion_etu | string | non | longueur max 20 |
+| id_niv_etude | int | oui | valeur de reference existante |
+| id_annee_acad | int | oui | annee academique existante |
+
+### Contrat de rapport d'erreur import
+```json
+{
+  "job_id": "...",
+  "status": "failed|partial|success",
+  "summary": {"rows_total": 0, "rows_ok": 0, "rows_error": 0},
+  "errors": [
+    {"line": 12, "column": "email_etu", "code": "VAL-002", "message": "format invalide"}
+  ]
+}
+```
+
+### Strategie d'idempotence
+- Cle idempotence par job: hash fichier + type import + annee.
+- Rejeu possible sans doublonner ecritures.
+- Journal de traitement pour reprise apres echec.
+
+### Gouvernance operationnelle import/export
+1. Dry-run obligatoire pour nouveaux templates.
+2. Validation humaine avant commit lot massif.
+3. Journalisation de l'acteur, du fichier et du resultat.
+4. Archivage du rapport de traitement pour audit.
+
+### Checklist import/export
+- [ ] Format CSV conforme au schema attendu.
+- [ ] Validation metier executee avant persistence.
+- [ ] Reprises sur erreur possibles.
+- [ ] Export trace dans audit.
+- [ ] Zero impact schema BDD.

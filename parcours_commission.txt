@@ -1,0 +1,722 @@
+================================================================================
+  PARCOURS UTILISATEUR - COMMISSION DE VALIDATION (GROUPE 11)
+  Documentation technique complète du flux utilisateur commission
+  Application CheckMaster - UFR MI / MIAGE - UFHB-CI
+================================================================================
+
+TABLE DES MATIÈRES
+==================
+1.  Connexion et authentification
+2.  Dashboard Commission (page=dashboard_commission)
+3.  Réception des rapports (page=reception_rapport_com)
+4.  Analyse et approbation (page=evaluation_dossiers)
+5.  Suivi d'avancement (page=processus_validation)
+6.  Rédaction compte rendu commission (page=redaction_compte_rendu)
+7.  Logique de vote et consensus
+8.  Tables de la base de données
+9.  Données de session et permissions
+10. Flux de données et interactions
+
+================================================================================
+1. CONNEXION ET AUTHENTIFICATION
+================================================================================
+
+Controller : AuthController
+Service    : CheckMaster\Services\AuthService
+
+Pour un membre de la commission de validation (id_GU = 11) :
+
+  1. AuthService::login() authentifie l'utilisateur.
+  
+  2. Selon le type d'utilisateur :
+     - 'Enseignant simple' ou 'Enseignant administratif' :
+       → Chargement via Enseignant::getEnseignantByLogin()
+       → Variables : specialite, grade, fonction, date_grade, date_fonction
+     
+     - 'Personnel administratif' :
+       → Chargement via PersAdmin::getPersAdminByLogin()
+       → Variables : telephone, poste, date_embauche
+  
+  3. Variables de session principales :
+     ┌─────────────────────────┬──────────────────────────────────────┐
+     │ Variable de session     │ Description                          │
+     ├─────────────────────────┼──────────────────────────────────────┤
+     │ id_utilisateur          │ ID de l'utilisateur                  │
+     │ id_GU                   │ 11 (Commission de validation)        │
+     │ lib_GU                  │ 'Commission de validation'           │
+     │ type_utilisateur        │ Type d'utilisateur                   │
+     │ niveau_acces            │ Niveau d'accès aux données           │
+     └─────────────────────────┴──────────────────────────────────────┘
+
+================================================================================
+2. DASHBOARD COMMISSION (page=dashboard_commission)
+================================================================================
+
+Controller : DashboardCommissionController
+Service    : CheckMaster\Services\DashboardCommissionService
+Méthodes   : index(), getDashboardData()
+
+Description :
+  Tableau de bord principal de la commission de validation avec indicateurs
+  clés de performance et vue d'ensemble des rapports.
+
+Flux d'exécution :
+
+  DashboardCommissionController::index()
+    │
+    └─ DashboardCommissionService::getDashboardData()
+         │
+         ├─ Statistiques globales :
+         │   → Nombre total de rapports
+         │   → Taux de validation global
+         │   → Temps moyen de traitement (en jours)
+         │   → Nombre de rapports en attente
+         │
+         ├─ Évolution mensuelle (6 derniers mois) :
+         │   → Nombre de rapports déposés par mois
+         │   → Nombre de rapports validés par mois
+         │   → Nombre de rapports rejetés par mois
+         │
+         ├─ Répartition par statut :
+         │   → En attente de dépôt
+         │   → Déposés, en attente de validation
+         │   → En cours d'évaluation
+         │   → Validés
+         │   → Rejetés
+         │
+         ├─ Performance par catégorie :
+         │   → Par niveau d'étude (Licence, Master)
+         │   → Par spécialité
+         │   → Par session (ordinaire, rattrapage)
+         │
+         ├─ Activités récentes :
+         │   → Derniers rapports déposés
+         │   → Dernières validations
+         │   → Dernières rejets
+         │
+         └─ Liste des évaluations :
+             → Évaluations récentes avec détails
+             → Temps de traitement par rapport
+
+Résultat retourné :
+  [
+    'stats' => [
+      'total_rapports'        => nombre total,
+      'taux_validation'       => pourcentage de validation,
+      'temps_moyen_traitement'=> en jours,
+      'rapports_en_attente'   => en attente de traitement,
+    ],
+    'evolution_mensuelle'   => [...],  // 6 mois
+    'repartition_statut'    => [...],  // par statut
+    'performance_categorie' => [...],  // par catégorie
+    'activites_recentes'    => [...],  // dernières activités
+    'evaluations'           => [...]   // liste des évaluations
+  ]
+
+En cas d'erreur :
+  → DashboardCommissionService::getDefaultDashboardData()
+  → Retourne des valeurs par défaut (stats à 0)
+
+Tables utilisées :
+  - rapport_etudiants     : rapports déposés
+  - valider               : décisions de validation
+  - approuver             : décisions d'approbation
+  - evaluations_rapports  : votes de la commission
+  - etudiants             : informations étudiants
+  - inscriptions          : année académique et niveau
+  - annee_academique      : filtrage temporel
+  - niveau_etude          : catégorisation par niveau
+
+================================================================================
+3. RÉCEPTION DES RAPPORTS (page=reception_rapport_com)
+================================================================================
+
+Controller : VerificationRapportsController
+Service    : CheckMaster\Services\VerificationRapportsService
+
+3.1 Affichage des rapports (index)
+
+  VerificationRapportsController::index()
+    │
+    └─ VerificationRapportsService::getIndexData()
+         │
+         ├─ Récupération de tous les rapports déposés
+         │   → Rapports avec statut 'deposé' ou 'en attente'
+         │   → Jointure avec étudiants pour affichage nom/prénom
+         │   → Jointure avec inscriptions pour année académique
+         │
+         ├─ Statistiques des rapports :
+         │   → Nombre total de rapports
+         │   → Répartition par statut (en attente, approuvé, désapprouvé)
+         │   → Dernier rapport déposé
+         │
+         └─ Injection dans $GLOBALS :
+             $GLOBALS['rapports']       = liste des rapports
+             $GLOBALS['nbRapports']     = nombre total
+             $GLOBALS['statsRapports']  = statistiques
+
+3.2 Validation d'un rapport (validerRapport)
+
+Vérification de permission :
+  if (!canEdit('verification_candidatures_soutenance'))
+    → Retourne ['success' => false, 'message' => "..."]
+
+Flux POST (AJAX) :
+  VerificationRapportsController::validerRapport()
+    │
+    ├─ Récupération des paramètres POST :
+    │   → id_rapport : ID du rapport à valider
+    │   → commentaire : commentaire optionnel
+    │
+    └─ VerificationRapportsService::validerRapport($id_rapport, $commentaire)
+         │
+         ├─ 1. Vérification que le rapport existe
+         │
+         ├─ 2. INSERT INTO approuver
+         │   → id_rapport, id_approb=4 (identifiant d'approbation),
+         │     date_approbation, commentaire, statut='approuvé'
+         │
+         ├─ 3. UPDATE rapport_etudiants
+         │   → SET statut_rapport = 'approuvé' WHERE id_rapport = ?
+         │
+         └─ 4. Audit : log de l'action
+
+3.3 Rejet d'un rapport (rejeterRapport)
+
+Vérification de permission :
+  if (!canEdit('verification_candidatures_soutenance'))
+
+Flux POST (AJAX) :
+  VerificationRapportsController::rejeterRapport()
+    │
+    ├─ Récupération des paramètres POST :
+    │   → id_rapport : ID du rapport à rejeter
+    │   → commentaire : raison du rejet
+    │
+    └─ VerificationRapportsService::rejeterRapport($id_rapport, $commentaire)
+         │
+         ├─ 1. Vérification que le rapport existe
+         │
+         ├─ 2. INSERT INTO approuver
+         │   → id_rapport, id_approb=4, date_approbation, commentaire,
+         │     statut='rejeté'
+         │
+         ├─ 3. UPDATE rapport_etudiants
+         │   → SET statut_rapport = 'rejeté' WHERE id_rapport = ?
+         │
+         └─ 4. Audit : log de l'action
+
+3.4 Détails d'un rapport
+
+  VerificationRapportsController::getRapportDetail($id_rapport)
+    → Récupère les détails complets d'un rapport
+    → Jointure avec étudiant, inscription, évaluations
+
+3.5 Décisions d'évaluation
+
+  VerificationRapportsController::getDecisionsEvaluation($id_rapport)
+    → Récupère toutes les décisions d'évaluation pour un rapport
+    → Jointure avec evaluations_rapports
+
+Tables utilisées :
+  - rapport_etudiants    : rapports des étudiants
+  - approuver            : décisions d'approbation/rejet
+  - etudiants            : informations étudiants
+  - inscriptions         : année académique
+  - evaluations_rapports : votes des membres de la commission
+  - audit_log            : piste d'audit
+
+================================================================================
+4. ANALYSE ET APPROBATION (page=evaluation_dossiers)
+================================================================================
+
+Controller : EvaluationDossiersController
+Service    : CheckMaster\Services\EvaluationDossiersService
+
+Description :
+  Cette page implémente le système de vote de la commission de validation.
+  Chaque membre peut voter pour valider ou rejeter un rapport, et la décision
+  finale est prise selon les règles de consensus.
+
+4.1 Affichage des dossiers (index)
+
+  EvaluationDossiersController::index()
+    │
+    └─ EvaluationDossiersService::getIndexData()
+         → Retourne les données pour la vue des dossiers à évaluer
+
+4.2 Traitement des actions (traiterAction)
+
+Méthode centrale qui dispatche les actions POST :
+
+  EvaluationDossiersController::traiterAction()
+    │
+    ├─ Vérification méthode POST
+    │
+    ├─ Récupération de l'action depuis POST['action'] ou GET['action']
+    │
+    ├─ Vérification de permission pour actions de mutation :
+    │   → valider_dossier, rejeter_dossier, traiter_decision, finaliser_decision
+    │   → if (!canEdit('evaluations_dossiers_soutenance')) → 403 JSON
+    │
+    └─ Switch sur l'action :
+
+4.2.1 Action 'valider_dossier'
+
+  → appelle $this->validerDossier($id_rapport)
+    │
+    └─ EvaluationDossiersService::validerDossier($id_rapport, $id_utilisateur)
+         │
+         ├─ 1. Vérification que l'utilisateur est un membre de la commission
+         │   → Vérifie que id_GU IN (11, 5) (commission ou admin)
+         │
+         ├─ 2. INSERT INTO evaluations_rapports
+         │   → id_rapport, id_utilisateur, decision='valider',
+         │     date_evaluation, commentaire
+         │
+         └─ 3. Retourne { success: true, message: '...' }
+
+4.2.2 Action 'rejeter_dossier'
+
+  → appelle $this->rejeterDossier($id_rapport, $commentaire)
+    │
+    └─ EvaluationDossiersService::rejeterDossier($id_rapport, $commentaire, $id_utilisateur)
+         │
+         ├─ 1. Vérification que l'utilisateur est membre de la commission
+         │
+         ├─ 2. INSERT INTO evaluations_rapports
+         │   → id_rapport, id_utilisateur, decision='rejeter',
+         │     date_evaluation, commentaire
+         │
+         └─ 3. Retourne { success: true, message: '...' }
+
+4.2.3 Action 'traiter_decision'
+
+  Chaque membre enregistre son avis individuel (sans décision finale) :
+
+  → appelle $this->traiterDecisionCommission($id_rapport, $decision, $commentaire)
+    │
+    └─ EvaluationDossiersService::traiterDecisionCommission(...)
+         │
+         ├─ 1. Validation de la décision ('valider' ou 'rejeter')
+         │
+         ├─ 2. INSERT INTO evaluations_rapports
+         │   → id_rapport, id_utilisateur, decision, date_evaluation, commentaire
+         │   → Un membre ne peut voter qu'une fois par rapport
+         │   → En cas de vote existant : UPDATE du vote
+         │
+         └─ 3. Retourne { success: true, votes: {...} }
+
+4.2.4 Action 'finaliser_decision'
+
+  Finalisation basée sur le consensus des votes :
+
+  → appelle $this->finaliserDecisionCommission($id_rapport)
+    │
+    └─ EvaluationDossiersService::finaliserDecisionCommission($id_rapport, $id_utilisateur)
+         │
+         ├─ 1. Comptage des votes
+         │   → SELECT COUNT(*) FROM evaluations_rapports
+         │     WHERE id_rapport = ? AND decision = 'valider'
+         │   → SELECT COUNT(*) FROM evaluations_rapports
+         │     WHERE id_rapport = ? AND decision = 'rejeter'
+         │
+         ├─ 2. Application des règles de consensus
+         │   → SI nombre de votes 'valider' >= 4 → décision = VALIDER
+         │   → SINON → décision = REJETER
+         │   (Voir section 7 pour détails sur les règles de consensus)
+         │
+         ├─ 3. Mise à jour du statut du rapport
+         │   → UPDATE rapport_etudiants SET statut_rapport = 'validé' ou 'rejeté'
+         │     WHERE id_rapport = ?
+         │
+         ├─ 4. INSERT INTO valider
+         │   → id_rapport, date_validation, decision_validation,
+         │     id_validateur (membre qui a finalisé)
+         │
+         └─ 5. Retourne { success: true, decision: '...' }
+
+4.2.5 Action 'get_statistiques'
+
+  → echo json_encode(EvaluationDossiersService::getStatistiques())
+    → Statistiques en temps réel pour la vue
+
+Réponses JSON :
+  Toutes les actions retournent du JSON :
+  { success: bool, message: string, [decision: string], [votes: array] }
+
+Tables utilisées :
+  - rapport_etudiants     : rapports à évaluer
+  - evaluations_rapports  : votes individuels des membres
+  - valider               : décisions finales de validation
+  - etudiants             : informations étudiants
+  - utilisateurs          : identification des membres votants
+  - groupe_utilisateur    : vérification de l'appartenance à la commission
+
+================================================================================
+5. SUIVI D'AVANCEMENT (page=processus_validation)
+================================================================================
+
+Controller : ProcessusValidationController
+Service    : CheckMaster\Services\ProcessusValidationService
+
+Description :
+  Page de suivi de l'avancement des validations. Permet de voir l'état
+  de chaque rapport, les votes des membres, et de finaliser les décisions.
+
+5.1 Données de la page (getDonneesPage)
+
+  ProcessusValidationController::getDonneesPage()
+    │
+    └─ ProcessusValidationService::getDonneesPage()
+         │
+         ├─ getRapportsAvecEvaluations()
+         │   → Récupère tous les rapports approuvés avec leurs évaluations
+         │   → Pour chaque rapport :
+         │     - Détails du rapport (thème, étudiant, date dépôt)
+         │     - Liste des évaluations (votes des membres)
+         │     - Statut de validation (en cours / validé / rejeté)
+         │     - Nombre de votes 'valider' vs 'rejeter'
+         │
+         ├─ getMembresCommission()
+         │   → Liste des enseignants membres de la commission
+         │   → SELECT * FROM enseignants WHERE id_GU IN (11, 5)
+         │   → Affichés avec leur statut de vote
+         │
+         └─ getStatistiques()
+             → Total des rapports
+             → Rapports en cours
+             → Rapports validés
+             → Rapports rejetés
+
+5.2 Finalisation d'un rapport (finaliserRapport)
+
+  ProcessusValidationController::finaliserRapport($id_rapport, $id_enseignant, $commentaire)
+    │
+    └─ ProcessusValidationService::finaliserRapport($id_rapport, $id_enseignant, $commentaire)
+         │
+         ├─ 1. Comptage des votes dans evaluations_rapports
+         │   → Nombre de votes 'valider'
+         │   → Nombre de votes 'rejeter'
+         │
+         ├─ 2. Décision selon consensus
+         │   → Si >= 4 votes 'valider' → décision = 'valider'
+         │   → Sinon → décision = 'rejeter'
+         │
+         ├─ 3. UPDATE rapport_etudiants
+         │   → SET statut_rapport = 'validé' ou 'rejeté'
+         │
+         ├─ 4. INSERT INTO valider
+         │   → id_rapport, id_enseignant, decision_validation,
+         │     date_validation, commentaire
+         │
+         └─ 5. Retourne { success: true, decision: '...' }
+
+Tables utilisées :
+  - rapport_etudiants     : rapports avec statut
+  - evaluations_rapports  : votes des membres
+  - valider               : décisions finales
+  - enseignants           : membres de la commission
+  - utilisateurs          : liens avec les comptes utilisateurs
+
+================================================================================
+6. RÉDACTION COMPTE RENDU COMMISSION (page=redaction_compte_rendu)
+================================================================================
+
+Controller : RedactionCompteRenduController
+Service    : CheckMaster\Services\RedactionCompteRenduService
+
+Partagé avec le parcours enseignant mais avec des permissions différentes
+pour la commission.
+
+6.1 Affichage (index)
+
+  RedactionCompteRenduController::index()
+    │
+    └─ RedactionCompteRenduService::getIndexData()
+         │
+         ├─ getRapportsValidesForSelectedYear()
+         │   → Rapports avec décision IN ('valider', 'rejeter')
+         │   → Exclut ceux déjà liés à un CR (compte_rendu_rapport)
+         │   → Filtre par année académique sélectionnée
+         │
+         └─ Enseignant::getAllEnseignants()
+             → Liste des enseignants pour affectation encadrant/directeur
+
+6.2 Enregistrement (enregistrer)
+
+Vérification de permission :
+  if (!canCreate('redaction_compte_rendu') && !canEdit('redaction_compte_rendu'))
+    → 403 (AJAX) ou redirection access_denied
+
+Flux complet :
+
+  RedactionCompteRenduController::enregistrer()
+    │
+    └─ RedactionCompteRenduService::enregistrer($data)
+         │
+         ├─ 1. Validation des données
+         │   → num_etu requis
+         │   → nom_CR requis
+         │
+         ├─ 2. Vérification année académique
+         │   → AcademicYear::ensureWritableYear()
+         │
+         ├─ 3. Génération du PDF (PdfGeneratorService/TCPDF)
+         │   → Contenu HTML → PDF
+         │   → Sauvegarde : ressources/uploads/comptes_rendus/CR_YYYYMMDD_HHMMSS.pdf
+         │
+         ├─ 4. Enregistrement en BD
+         │   → CompteRendu::creer() → INSERT INTO compte_rendu
+         │   → Pour chaque rapport sélectionné :
+         │     INSERT INTO compte_rendu_rapport (id_CR, id_rapport)
+         │
+         ├─ 5. Affectations encadrant/directeur
+         │   → Pour chaque rapport dans le CR :
+         │     INSERT INTO affecter (id_enseignant, id_rapport, role) VALUES (?, ?, 'encadrant')
+         │     INSERT INTO affecter (id_enseignant, id_rapport, role) VALUES (?, ?, 'directeur')
+         │
+         └─ 6. Notifications email
+             → EmailService::sendTemplate('REPORT_NOTIFICATION')
+             → Envoi à chaque étudiant dont le rapport est inclus
+             → Pièce jointe : PDF du CR
+
+6.3 Export PDF (exporterPDF)
+
+  RedactionCompteRenduController::exporterPDF()
+    → Génération PDF à la volée pour prévisualisation
+    → Retourne Content-Type: application/pdf
+
+Spécificités commission vs enseignant :
+  - La commission peut rédiger des CR pour tous les rapports validés
+  - L'enseignant ne peut rédiger des CR que pour ses propres rapports
+  - La commission a accès à la vue processus_validation pour finaliser
+
+================================================================================
+7. LOGIQUE DE VOTE ET CONSENSUS
+================================================================================
+
+7.1 Structure du système de vote
+
+  Chaque membre de la commission (id_GU IN (11, 5)) peut voter sur
+  un rapport via la table evaluations_rapports.
+
+  Schéma de la table evaluations_rapports :
+  ┌─────────────────────────┬──────────────────────────────────────────┐
+  │ Colonne                 │ Description                              │
+  ├─────────────────────────┼──────────────────────────────────────────┤
+  │ id_evaluation           │ Identifiant unique du vote               │
+  │ id_rapport              │ Rapport concerné                         │
+  │ id_utilisateur          │ Membre qui a voté                        │
+  │ decision                │ 'valider' ou 'rejeter'                   │
+  │ commentaire             │ Commentaire du membre                    │
+  │ date_evaluation         │ Date/heure du vote                       │
+  └─────────────────────────┴──────────────────────────────────────────┘
+
+7.2 Règles de consensus
+
+  La décision finale est prise selon le consensus suivant :
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ RÈGLE : Si le nombre de votes 'valider' >= 4, le rapport est       │
+  │         validé. Sinon, il est rejeté.                              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Scénarios typiques (si 5 membres votent) :
+  ┌─────────────┬─────────────┬──────────────────────────────────────┐
+  │ Votes       │ Votes       │ Décision                             │
+  │ Valider     │ Rejeter     │ Finale                               │
+  ├─────────────┼─────────────┼──────────────────────────────────────┤
+  │ 5           │ 0           │ VALIDÉ (unanimement)                 │
+  │ 4           │ 1           │ VALIDÉ (majorité)                    │
+  │ 3           │ 2           │ REJETÉ (majorité insuffisante)       │
+  │ 2           │ 3           │ REJETÉ (majorité contre)             │
+  │ 1           │ 4           │ REJETÉ (majorité contre)             │
+  │ 0           │ 5           │ REJETÉ (unanimement)                 │
+  └─────────────┴─────────────┴──────────────────────────────────────┘
+
+7.3 Processus de vote détaillé
+
+  Étape 1 : Réception du rapport
+    → Le rapport est déposé par l'étudiant (candidature_soutenance)
+    → Vérification par le secrétaire (verification_rapports)
+    → Si approuvé, le rapport passe en "attente d'évaluation"
+
+  Étape 2 : Évaluation individuelle
+    → Chaque membre de la commission accède à page=evaluation_dossiers
+    → Pour chaque rapport, le membre peut :
+      a) Valider (valider_dossier) → INSERT evaluations_rapports avec 'valider'
+      b) Rejeter (rejeter_dossier) → INSERT evaluations_rapports avec 'rejeter'
+      c) Commenter (traiter_decision) → Mise à jour de son vote existant
+    → Un membre ne peut voter qu'une fois par rapport
+
+  Étape 3 : Finalisation
+    → Un membre de la commission finalise (finaliser_decision)
+    → Le système compte les votes
+    → La décision est appliquée (>= 4 valider = validé, sinon rejeté)
+    → Le statut du rapport est mis à jour
+    → Un enregistrement est créé dans la table valider
+
+7.4 Gestion des cas particuliers
+
+  - Vote dupliqué : Un membre ne peut voter qu'une fois ; son vote est
+    mis à jour s'il vote à nouveau.
+  - Finalisation prématurée : La finalisation peut être effectuée même
+    si tous les membres n'ont pas voté.
+  - Quorum : Il n'y a pas de vérification de quorum explicite dans le code.
+  - Annulation : Aucun mécanisme d'annulation de vote n'est implémenté.
+
+================================================================================
+8. TABLES DE LA BASE DE DONNÉES
+================================================================================
+
+┌─────────────────────────┬─────────────────────────────────────────────────┐
+│ Table                   │ Rôle dans le parcours commission                │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ utilisateurs            │ Compte d'authentification, id_GU=11             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ enseignants             │ Informations des membres de la commission       │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ rapport_etudiants       │ Rapports de candidature à évaluer               │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ evaluations_rapports    │ Votes individuels des membres de la commission  │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ valider                 │ Décisions finales de validation                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ approuver               │ Décisions d'approbation (réception rapports)    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ etudiants               │ Informations des étudiants                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ inscriptions            │ Inscriptions académiques (année, niveau)        │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ annee_academique        │ Années académiques                              │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_etude            │ Niveaux d'étude                                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ compte_rendu            │ Comptes rendus de la commission                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ compte_rendu_rapport    │ Pivot CR ↔ rapports                             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ affecter                │ Affectation encadrant/directeur                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ groupe_utilisateur      │ Groupes utilisateur (id=11 commission)          │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ audit_log               │ Piste d'audit des actions commission            │
+└─────────────────────────┴─────────────────────────────────────────────────┘
+
+================================================================================
+9. DONNÉES DE SESSION ET PERMISSIONS
+================================================================================
+
+Variables de session pour la commission :
+
+┌───────────────────────────┬──────────────────────────────────────────────┐
+│ Variable                  │ Description                                  │
+├───────────────────────────┼──────────────────────────────────────────────┤
+│ id_utilisateur            │ ID de l'utilisateur connecté                 │
+│ nom_utilisateur           │ Nom d'affichage                              │
+│ login_utilisateur         │ Login                                        │
+│ id_GU                     │ 11 (Commission de validation)                │
+│ lib_GU                    │ 'Commission de validation'                   │
+│ type_utilisateur          │ Type d'utilisateur                           │
+│ niveau_acces              │ Niveau d'accès aux données                   │
+│ specialite                │ Spécialité (si enseignant)                   │
+│ grade                     │ Grade (si enseignant)                        │
+│ fonction                  │ Fonction (si enseignant)                     │
+└───────────────────────────┴──────────────────────────────────────────────┘
+
+Permissions de la commission :
+
+┌──────────────────────────────────┬──────┬────────┬──────┬────────┐
+│ Page                             │ View │ Create │ Edit │ Delete │
+├──────────────────────────────────┼──────┼────────┼──────┼────────┤
+│ dashboard_commission             │ OUI  │ -      │ -    │ -      │
+│ reception_rapport_com            │ OUI  │ -      │ OUI  │ -      │
+│ evaluation_dossiers              │ OUI  │ OUI    │ OUI  │ -      │
+│ processus_validation             │ OUI  │ -      │ OUI  │ -      │
+│ redaction_compte_rendu           │ OUI  │ OUI    │ OUI  │ -      │
+└──────────────────────────────────┴──────┴────────┴──────┴────────┘
+
+Vérifications effectuées :
+  - canEdit('verification_candidatures_soutenance')
+    → validation/rejet de rapports (reception_rapport_com)
+  - canEdit('evaluations_dossiers_soutenance')
+    → votes et finalisation (evaluation_dossiers)
+  - canCreate('redaction_compte_rendu')
+    → création de comptes rendus
+  - canEdit('redaction_compte_rendu')
+    → modification de comptes rendus
+
+================================================================================
+10. FLUX DE DONNÉES ET INTERACTIONS
+================================================================================
+
+Flux principal de la commission de validation :
+
+1. Connexion → Dashboard Commission :
+   AuthService::login() → session id_GU=11 →
+   DashboardCommissionController::index() →
+   DashboardCommissionService::getDashboardData() →
+   Stats rapports + taux validation + temps traitement →
+   Vue dashboard_commission
+
+2. Dashboard → Réception Rapports :
+   Navigation → VerificationRapportsController::index() →
+   Chargement rapports déposés + statistiques →
+   Vue reception_rapport_com →
+   Action valider/rejeter → VerificationRapportsService →
+   INSERT approuver + UPDATE rapport_etudiants → Audit
+
+3. Réception → Évaluation :
+   Navigation → EvaluationDossiersController::index() →
+   Chargement dossiers → Vue evaluation_dossiers →
+   Membre vote (valider/rejeter) → evaluations_rapports →
+   Finalisation → Comptage votes → Décision (>=4 valider) →
+   INSERT valider + UPDATE statut_rapport
+
+4. Évaluation → Suivi :
+   Navigation → ProcessusValidationController::getDonneesPage() →
+   Vue processus_validation → Suivi état chaque rapport →
+   Membres commission affichés → Statuts mis à jour →
+   Finalisation possible → INSERT valider
+
+5. Suivi → Rédaction CR :
+   Navigation → RedactionCompteRenduController::index() →
+   Chargement rapports validés → Vue redaction_compte_rendu →
+   Sélection rapports + rédaction + affectation encadrants →
+   POST enregistrer → PdfGeneratorService → INSERT compte_rendu +
+   compte_rendu_rapport + affecter → EmailService → Succès
+
+Séquence complète d'un rapport :
+
+  Étudiant dépose candidature
+    ↓
+  Rapport créé (rapport_etudiants, statut = 'déposé')
+    ↓
+  Commission réceptionne (verification_rapports)
+    ↓
+  INSERT approuver (id_approb=4) ou rejet
+    ↓
+  Statut mis à jour ('approuvé' ou 'rejeté')
+    ↓
+  Si approuvé : membres évaluent (evaluation_dossiers)
+    ↓
+  Chaque membre vote (evaluations_rapports)
+    ↓
+  Finalisation : comptage des votes
+    ↓
+  Décision : >= 4 'valider' = validé, sinon rejeté
+    ↓
+  INSERT valider (décision finale)
+    ↓
+  Statut rapport mis à jour ('validé' ou 'rejeté')
+    ↓
+  Commission rédige CR (redaction_compte_rendu)
+    ↓
+  INSERT compte_rendu + compte_rendu_rapport + affecter
+    ↓
+  PDF généré, emails envoyés aux étudiants
+
+================================================================================
+FIN DE DOCUMENTATION
+================================================================================

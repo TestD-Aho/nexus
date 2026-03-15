@@ -1,0 +1,344 @@
+PLAN DE CENTRALISATION ET REDUCTION DU CODE - CHECKMASTER
+Source analysee: extracted_helpers.txt + cartographie_app_complete.txt + RAPPORT_VIE_APP.txt
+Date: 2026-03-14
+
+================================================================================
+1) CONSTATS FACTUELS (BASE SUR LES 3 RAPPORTS)
+================================================================================
+
+1.1 Volume et dispersion
+- app/ contient 169 fichiers PHP.
+- Repartition: 42 controllers, 45 services, 48 models (cartographie).
+- 192 routes pour 72 pages (extracted_helpers).
+- 80 fichiers contiennent du SQL (extracted_helpers).
+
+1.2 Hotspots routes/controllers
+- Pages les plus verbeuses:
+  - gestion_rapports: 12 routes
+  - programmation_soutenance: 12 routes
+  - evaluations_dossiers_soutenance: 9 routes
+  - gestion_utilisateurs: 9 routes
+  - admin_historique: 8 routes
+  - gestion_etudiants: 8 routes
+- Controllers les plus charges:
+  - GestionRhController: 14 routes
+  - ProgrammationSoutenanceController: 13 routes
+  - GestionEtudiantController: 12 routes
+  - GestionRapportController: 12 routes
+  - EvaluationDossiersController: 11 routes
+
+1.3 Hotspots services/models (taille fonctionnelle)
+- Services lourds:
+  - GestionRapportService: 40 methodes
+  - EvaluationSoutenanceService: 35 methodes
+  - ProgrammationSoutenanceService: 33 methodes
+  - ParametreService: 30 methodes
+- Models lourds:
+  - Archive: 42 methodes
+  - Utilisateur: 38 methodes
+  - Etudiant: 32 methodes
+  - RapportEtudiant: 32 methodes
+  - Scolarite: 31 methodes
+
+1.4 Zones SQL dupliquees / transverses
+- Tables les plus utilisees (donc priorite de mutualisation):
+  - etudiants (28 fichiers)
+  - inscriptions (24 fichiers)
+  - annee_academique (19 fichiers)
+  - rapport_etudiants (15 fichiers)
+  - enseignants (13 fichiers)
+  - niveau_etude (12 fichiers)
+- Pattern recurrent:
+  - jointures etudiants + inscriptions
+  - filtrage par annee academique
+  - requetes statistiques dashboards
+  - requetes de workflow rapport/validation/soutenance
+
+1.5 Incoherences schema (a corriger avant gros refactor)
+- 16 tables requetees mais absentes de audit.txt:
+  activites, approuver, composer_jury, correspondre, cours, devoirs,
+  dossier_academique, echeances, etudiant, evaluations, inscription_ecue,
+  paiements, programmer, rapport, reclamation, ue.
+- Tant que ce point n'est pas gere par une couche de normalisation, vous dupliquez
+  des if/else et des fallback SQL partout.
+
+1.6 Branching applicatif
+- 33 controllers ont un lien Controller -> Service propre.
+- 4 controllers ont des liens partiels (ex: authService/pvService/rapportService/recuService).
+- 5 controllers sont "a verifier" sans dependance service explicite.
+- Conclusion: architecture hybride legacy + service-layer, donc duplication inevitable
+  si on ne met pas une couche commune de transition.
+
+================================================================================
+2) OBJECTIF REEL: REDUIRE LE CODE SANS CASSER LE METIER
+================================================================================
+
+Vous ne devez pas "mettre tout dans un seul fichier PHP".
+Vous devez centraliser la logique dupliquee dans quelques composants pivots.
+
+Objectif pragmatique:
+- Moins de SQL duplique.
+- Moins de controllers "copier-coller" par action.
+- Moins de services "god class".
+- Models plus minces, axes sur acces donnees coherent.
+- Gestion explicite des alias legacy vs schema actuel.
+
+================================================================================
+3) FICHIERS PIVOTS A CREER (CENTRALISATION)
+================================================================================
+
+3.1 Couche SQL commune
+Creer:
+- app/Support/Sql/QueryCatalog.php
+- app/Support/Sql/QueryExecutor.php
+- app/Support/Sql/PaginationSql.php
+- app/Support/Sql/SchemaAliasResolver.php
+
+Role:
+- QueryCatalog.php:
+  stocke les requetes recurrentes (lecture etudiants, inscriptions, annee, rapport).
+- QueryExecutor.php:
+  execute prepare/execute/fetch avec conventions uniques (logs + erreurs + timing).
+- PaginationSql.php:
+  centralise LIMIT/OFFSET/ORDER BY whiteliste.
+- SchemaAliasResolver.php:
+  mappe les noms legacy -> schema courant (etudiant=>etudiants, etc).
+
+Impact:
+- suppression massive des SQL "quasi identiques" dans services/models.
+- une seule source pour normaliser les tables incompatibles.
+
+3.2 Couche repository metier (intermediaire entre service et model)
+Creer:
+- app/Repositories/BaseRepository.php
+- app/Repositories/AcademicContextRepository.php
+- app/Repositories/StudentRepository.php
+- app/Repositories/InscriptionRepository.php
+- app/Repositories/RapportRepository.php
+- app/Repositories/SoutenanceRepository.php
+- app/Repositories/AuditRepository.php
+
+Role:
+- encapsuler les requetes par aggregate metier (pas par page UI).
+- supprimer la duplication cross-service.
+
+Priorite technique:
+- StudentRepository + InscriptionRepository d'abord
+  (ce sont vos deux tables les plus transverses).
+
+3.3 Couche service commune (transverse)
+Creer:
+- app/Services/Common/AcademicYearContextService.php
+- app/Services/Common/AuditTrailService.php
+- app/Services/Common/AuthorizationContextService.php
+- app/Services/Common/DashboardMetricsService.php
+- app/Services/Common/DocumentRenderService.php
+
+Role:
+- AcademicYearContextService:
+  une seule regle pour recuperer/appliquer l'annee academique active.
+- AuditTrailService:
+  centralise logCreation/logModification/logValidation.
+- DashboardMetricsService:
+  factorise les KPI repetes.
+- DocumentRenderService:
+  factorise le tronc commun PDF/HTML->PDF.
+
+3.4 Couche controller commune
+Creer:
+- app/controllers/BaseController.php
+- app/controllers/traits/ActionDispatchTrait.php
+- app/controllers/traits/ApiResponseTrait.php
+- app/controllers/traits/FormValidationTrait.php
+
+Role:
+- BaseController:
+  injection des dependances communes + helpers de reponse.
+- ActionDispatchTrait:
+  map action => methode (evite 50 if/elseif par controller).
+- ApiResponseTrait:
+  jsonSuccess/jsonError/redirect standardises.
+- FormValidationTrait:
+  validation uniforme des inputs GET/POST.
+
+================================================================================
+4) OU VOUS GAGNEZ LE PLUS VITE
+================================================================================
+
+4.1 Consolidation dashboards (gain rapide)
+Constat:
+- DashboardService, DashboardSecretaireService, DashboardCommissionService
+  ont des requetes statistiques proches.
+Action:
+- deplacer les requetes KPI vers DashboardMetricsService + repositories.
+Resultat attendu:
+- moins de duplication SQL + moins de divergence de metriques.
+
+4.2 Consolidation archives (gain structurel)
+Constat:
+- ArchiveController, ArchiveEtudiantController, ArchiveSoutenanceController,
+  ArchiveDocumentController, ArchiveHubController ont des patterns proches.
+Action:
+- creer ArchiveQueryService + ArchiveExportService + base controller archive.
+Resultat attendu:
+- reduction forte du code controller repetitif.
+
+4.3 Consolidation soutenance (gros gain)
+Constat:
+- PlanificationSoutenanceService + ProgrammationSoutenanceService +
+  EvaluationSoutenanceService se recouvrent sur etudiants/inscriptions/salles/jury.
+Action:
+- extraire SoutenanceRepository + JuryRepository + SchedulePolicyService.
+Resultat attendu:
+- baisse de duplication et meilleure lisibilite des regles metier.
+
+4.4 Consolidation parametres
+Constat:
+- ParametreService (30 methodes) + models de referentiels repetitifs.
+Action:
+- introduire GenericReferentialRepository pour CRUD des tables de reference.
+Resultat attendu:
+- moins de code boilerplate, plus de coherence.
+
+================================================================================
+5) SPLIT DES "GOD CLASSES" (SANS CHANGER LE COMPORTEMENT)
+================================================================================
+
+5.1 GestionRapportService (40 methodes)
+Proposition de split:
+- RapportQueryService (lecture/liste/filtres)
+- RapportWorkflowService (validation/statuts/transitions)
+- RapportDocumentService (generation PDF/fichiers)
+- RapportNotificationService (emails/alertes)
+
+5.2 EvaluationSoutenanceService (35 methodes)
+Proposition:
+- EvaluationCriteriaService
+- EvaluationScoreService
+- EvaluationDecisionService
+- EvaluationHistoryService
+
+5.3 ProgrammationSoutenanceService (33 methodes)
+Proposition:
+- SoutenancePlanningService
+- JuryAssignmentService
+- RoomAvailabilityService
+- SoutenancePublicationService
+
+5.4 Models volumineux
+- Archive (42), Utilisateur (38), Etudiant/RapportEtudiant (32), Scolarite (31)
+Action:
+- garder les models pour acces donnees "pur"
+- deplacer regles metier et orchestration vers services/repositories
+- appliquer BaseRepository + traits reutilisables.
+
+================================================================================
+6) REDUIRE LES REQUETES SQL (CONCRET)
+================================================================================
+
+6.1 Standardiser les jointures recurrentes
+Centraliser dans QueryCatalog:
+- etudiant + inscription active
+- rapport + etudiant + annee
+- soutenance + jury + salle
+- reclamation + etudiant
+
+6.2 Introduire des vues SQL metier (optionnel mais puissant)
+Exemples:
+- v_etudiant_contexte_academique
+- v_rapport_statut_global
+- v_soutenance_detail
+
+Resultat:
+- SQL applicatif plus court, moins de risque de divergence.
+
+6.3 Eliminer N+1 et recalculs
+- preferez requetes groupees pour dashboards.
+- cache court (memoire requete) pour referentiels stables
+  (annee_academique, niveau_etude, grade, specialite).
+
+6.4 Normaliser les noms de tables legacy
+- ajouter un resolvage de table dans SchemaAliasResolver.
+- supprimer les variantes dans le code applicatif apres migration.
+
+================================================================================
+7) REDUIRE LE NOMBRE DE SERVICES/CONTROLLERS/MODELS
+================================================================================
+
+7.1 Controllers
+Regle:
+- 1 controller = orchestration HTTP uniquement.
+- pas de SQL direct en controller.
+- pas de logique metier lourde.
+
+Action immediate:
+- basculer les 5 controllers "a verifier" vers des services explicites.
+- corriger les 4 references partielles de services introuvables.
+
+7.2 Services
+Regle:
+- un service par capability metier.
+- max de responsabilites claires (query, workflow, export, notif).
+- utiliser Common services pour le transversal.
+
+7.3 Models
+Regle:
+- models = acces DB atomique + mapping.
+- pas de logique de workflow multi-objets.
+- reutiliser BaseRepository/traits CRUD.
+
+================================================================================
+8) FEUILLE DE ROUTE RECOMMANDEE (ORDRE D'EXECUTION)
+================================================================================
+
+Etape 1 - Stabiliser le schema
+- implementer SchemaAliasResolver.
+- corriger les 16 tables incompatibles (mapping ou migration SQL).
+
+Etape 2 - Mutualiser SQL transverse
+- introduire QueryCatalog + QueryExecutor + repositories coeur:
+  StudentRepository, InscriptionRepository, RapportRepository.
+
+Etape 3 - Refactor controllers volumineux
+- appliquer BaseController + ActionDispatchTrait.
+- traiter en priorite:
+  GestionRapportController, ProgrammationSoutenanceController,
+  EvaluationDossiersController, GestionRhController.
+
+Etape 4 - Spliter les gros services
+- GestionRapportService, EvaluationSoutenanceService,
+  ProgrammationSoutenanceService, ParametreService.
+
+Etape 5 - Rationaliser models
+- deplacer logique metier des models lourds vers services/repositories.
+- conserver seulement le data access coherent.
+
+================================================================================
+9) QUICK WINS TRES CONCRETS (A FAIRE TOUT DE SUITE)
+================================================================================
+
+1) Creer AcademicYearContextService et remplacer les recuperations annee dupliquees.
+2) Creer DashboardMetricsService et deplacer les KPI dashboards.
+3) Creer un alias map de routes/page:
+   - programmation_soutenance / programation_soutenance
+   - planification_soutenance / plannification_soutenance
+4) Creer BaseController + methode dispatchAction(array $map).
+5) Extraire les SELECT repetes annee_academique et niveau_etude dans QueryCatalog.
+
+================================================================================
+10) RESULTAT ATTENDU APRES CENTRALISATION
+================================================================================
+
+- Moins de fichiers touches par une evolution metier transversale.
+- Moins de regressions SQL (une requete centralisee au lieu de N copies).
+- Controllers plus lisibles et plus courts.
+- Services decoupes par responsabilite.
+- Models plus stables.
+- Alignement plus fiable avec audit.txt.
+
+En resume:
+Le levier principal n'est pas de "fusionner en un seul bloc", mais de creer
+des points de verite uniques (QueryCatalog, Repositories, Common Services,
+BaseController, SchemaAliasResolver) et de faire converger progressivement
+tout le code actuel vers ces points centraux.
+

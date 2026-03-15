@@ -1,0 +1,143 @@
+# PRD-05 - Performance, cache et observabilite backend
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-01, PRD-02, PRD-03, PRD-04
+- Composant impose: `psr/simple-cache`
+
+## Resume executif
+Ce PRD definit la strategie de performance backend avec cache standardise, reduction des requetes redondantes, et observabilite bout-en-bout pour suivre la sante applicative sans toucher a la structure BDD.
+
+## Objectifs
+1. Diminuer le temps de reponse des endpoints critiques.
+2. Eviter les recalculs repetitifs et les acces DB inutiles.
+3. Rendre visibles les goulots de performance.
+4. Encadrer l'invalidation cache de maniere fiable.
+
+## Contraintes non negociables
+1. Aucune modification schema BDD.
+2. Pas de cache qui contourne les permissions.
+3. Pas de fallback silencieux en cas d'erreur cache.
+4. Cache transparent et tracable.
+
+## Composants a implementer
+- `app\Cache\CacheManager.php` (PSR-16)
+- `app\Cache\CacheKeyFactory.php`
+- `app\Cache\CachePolicyRegistry.php`
+- `app\Observability\QueryMonitor.php`
+- `app\Observability\RequestTrace.php`
+- `app\Observability\MetricsPublisher.php`
+
+## Couches de cache cibles
+1. Cache referentiels (annees, niveaux, statuts, roles).
+2. Cache dashboards (stats lecture frequente).
+3. Cache permissions resolvees (courte duree).
+4. Cache requetes repository sur filtres standard.
+
+## Exigences fonctionnelles (FR)
+- FR-05-01: cache de lectures stables avec TTL parametrable.
+- FR-05-02: invalidation fine sur ecritures impactantes.
+- FR-05-03: fallback clair si backend cache indisponible.
+- FR-05-04: logs de hit/miss par domaine.
+- FR-05-05: traces de latence par endpoint.
+
+## Exigences techniques (NFR)
+- NFR-05-01: interface cache unique (`Psr\SimpleCache\CacheInterface`).
+- NFR-05-02: compatibilite backend cache (fichier/memoire) via adaptateurs.
+- NFR-05-03: correlation id requete pour logs.
+- NFR-05-04: seuil d'alerte latence configurable.
+
+## Exemple de conventions de cles cache
+- `ref:annee_academique:all`
+- `dashboard:commission:year:{id_annee}`
+- `permission:user:{id_utilisateur}:route:{pattern}:action:{crud}`
+- `repo:etudiants:year:{id_annee}:page:{p}:limit:{l}:hash:{filtres}`
+
+## Modules impactes
+- Services dashboard: `DashboardService`, `DashboardScolariteService`, `DashboardCommissionService`, `DashboardSecretaireService`.
+- Security: `AuthorizationService`, `RouteActionResolver`.
+- Repositories: `StudentRepository`, `RapportRepository`, `SoutenanceRepository`.
+- Archives: services de consultation historique.
+
+## Tables les plus sollicitees (lecture optimisee)
+- `etudiants`, `inscriptions`, `rapport_etudiants`, `valider`
+- `programmer_soutenance`, `enseignant_jury`
+- `permissions`, `route_actions`, `pister`
+
+## Plan d'implementation
+1. Mettre en place CacheManager et politiques TTL.
+2. Instrumenter QueryMonitor et traces requetes.
+3. Ajouter cache dans services lecture priorites.
+4. Ajouter invalidation sur flux ecriture critiques.
+5. Ajuster seuils et corriger hotspots.
+
+## Strategie de test
+- Tests unitaires cache key factory.
+- Tests d'invalidation sur scenarios metier.
+- Tests charge et latence sur endpoints prioritaires.
+- Tests de securite (pas de fuite cross-user via cache).
+
+## Criteres d'acceptation
+- Reduction mesurable des temps de reponse sur pages critiques.
+- Aucune incoherence metier due au cache.
+- Traces de performance disponibles par endpoint.
+- Aucun changement schema BDD.
+
+## Risques et mitigations
+- Risque: donnees stale apres ecriture.  
+  Mitigation: invalidation evenementielle par domaine.
+- Risque: pression memoire.  
+  Mitigation: TTL court + quotas + eviction policy.
+- Risque: fuite permission via cache mal cle.  
+  Mitigation: cles scopees par utilisateur/groupe/contexte.
+
+## Definition of done
+- Cache PSR simple actif sur domaines cibles.
+- Observabilite latence et requetes en place.
+- Guide d'exploitation performance livre.
+
+## Annexe detaillee E - SLI/SLO et matrice d'invalidation cache
+
+### SLI cibles
+- Latence P50, P95, P99 par endpoint critique.
+- Taux d'erreur 5xx par domaine fonctionnel.
+- Hit ratio cache par namespace.
+- Temps moyen execution requetes DB critiques.
+
+### SLO cibles backend
+- P95 endpoints lecture prioritaires <= 500ms.
+- Taux d'erreur 5xx <= 1% sur fenetre glissante.
+- Hit ratio cache referentiels >= 80%.
+- Hit ratio cache permissions >= 90%.
+
+### Matrice d'invalidation
+| Evenement metier | Namespace cache a invalider |
+|---|---|
+| Nouvelle inscription / versement | `ref:*`, `repo:etudiants:*`, `dashboard:*` |
+| Depot / validation rapport | `repo:rapports:*`, `dashboard:commission:*` |
+| Changement permission utilisateur | `permission:user:*` |
+| Changement annee active | `ref:annee_academique:*`, `dashboard:*` |
+
+### Schema de logs observabilite
+- `request_id`
+- `route`
+- `actor_id`
+- `duration_ms`
+- `sql_count`
+- `cache_hit_count`
+- `status_code`
+- `error_code` (si erreur)
+
+### Scenario de charge a couvrir
+1. Dashboard commission sur annee active.
+2. Liste etudiants paginee avec filtres.
+3. Recherche archives multi-criteres.
+4. Export CSV sur gros volume.
+
+### Checklist performance
+- [ ] Tous les endpoints critiques traces.
+- [ ] Cache policies documentees et appliquees.
+- [ ] Invalidation operationnelle sur ecritures critiques.
+- [ ] Mesures SLI/SLO visibles par l'equipe.
+- [ ] Aucun besoin de modification schema BDD pour optimiser.

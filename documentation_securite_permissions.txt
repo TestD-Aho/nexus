@@ -1,0 +1,479 @@
+================================================================================
+  DOCUMENTATION TECHNIQUE CHECKMASTER — SÉCURITÉ ET PERMISSIONS
+  Système RBAC (Registry + DB) — 9 Groupes Utilisateurs
+  Date : 14 mars 2026
+================================================================================
+
+
+1. VUE D'ENSEMBLE DU SYSTÈME DE PERMISSIONS
+============================================
+
+Le système de permissions de CheckMaster est un système RBAC hybride qui
+combine :
+- Un registre de permissions statique (permission_registry.php)
+- Une base de données pour les permissions dynamiques (tables route_actions,
+  fonctionnalites, permissions)
+- Un système de résolution d'actions par pattern matching sur les requêtes
+  legacy (?page=...&action=...)
+
+Le système supporte 4 niveaux d'action CRUD :
+  - voir     : accès en lecture
+  - creer    : création d'éléments
+  - modifier : modification d'éléments
+  - supprimer: suppression d'éléments
+
+
+2. GROUPES UTILISATEURS (9 groupes)
+====================================
+
+Définis dans app/config/permission_registry.php :
+
+ID  | Nom                         | Libellé DB
+----|-----------------------------|----------------------------------
+ 5  | administrateur              | Administrateur système
+ 6  | secretaire                  | Secrétaire
+ 7  | charge_communication        | Chargé(e) de communication
+ 8  | responsable_scolarite       | Responsable scolarité
+ 9  | responsable_filiere         | Responsable Filière
+10  | responsable_niveau          | Responsable niveau
+11  | commission                  | Commission/Validation
+12  | enseignant                  | Enseignant
+13  | etudiant                    | Etudiant
+
+Note : Les IDs 5-13 sont des identifiants primaires de la table
+groupe_utilisateur (id_GU).
+
+
+3. PERMISSIONREGISTRY — app/Security/PermissionRegistry.php
+===========================================================
+
+Namespace : CheckMaster\Security
+Classe    : PermissionRegistry (final)
+
+Le registre charge le fichier app/config/permission_registry.php une seule
+fois et met en cache le résultat en mémoire (static $registry).
+
+Méthodes publiques :
+--------------------
+
+all(): array
+  Retourne l'intégralité du registre chargé depuis le fichier de config.
+
+feature(string $slug): array
+  Retourne la définition d'une feature par son slug.
+
+features(): array
+  Retourne toutes les features indexées par slug.
+
+groups(): array
+  Retourne le mapping nom_groupe → id_groupe.
+  Exemple : ['administrateur' => 5, 'secretaire' => 6, ...]
+
+slugAliases(): array
+  Retourne les alias de slugs.
+  Exemple : 'evaluation_dossiers' → 'evaluations_dossiers_soutenance'
+
+categoryDefaults(): array
+  Retourne les permissions par défaut par catégorie et par groupe.
+
+publicRoutes(): array
+  Retourne les routes publiques (sans authentification).
+
+canonicalSlug(string $slug): string
+  Résout un slug à sa forme canonique en suivant la chaîne d'aliases.
+  Protection contre les boucles infinies via un tableau $seen.
+
+findFeatureByIdentifier(string $identifier): array
+  Recherche multi-stratégie pour trouver une feature :
+  1. Recherche par slug canonique
+  2. Recherche par menu_url (?page=identifier)
+  3. Recherche dans existing_codes
+  4. Recherche dans les patterns de routes
+
+allRoutes(): array
+  Retourne toutes les routes de toutes les features avec le slug associé.
+
+isPublicRoute(string $pattern, string $method): bool
+  Vérifie si un pattern de route est dans la liste des routes publiques.
+
+
+4. PERMISSION REGISTRY CONFIG — app/config/permission_registry.php
+==================================================================
+
+Fichier d'environ 1056 lignes définissant tout le système de permissions.
+
+Sections principales :
+
+4.1 Groups (lignes 5-15)
+  Mapping nom → ID pour les 9 groupes.
+
+4.2 Capability helpers (lignes 17-30)
+  $cap(bool $view, bool $create, bool $edit, bool $delete): array
+  Raccourcis : $none, $view, $viewEdit, $createEdit, $full
+
+4.3 Profile matrix (lignes 32-35)
+  Tous les groupes ont $viewEdit (voir + modifier) sur le profil.
+
+4.4 Category defaults (lignes 37-65)
+  7 catégories avec permissions par défaut :
+  - ADMIN_PLATEFORME : Administrateur → full
+  - SCOLARITE : Administrateur, Responsable scolarité → full
+  - ETUDIANT_ENV : Administrateur → full, Etudiant → view
+  - COMMISSION : Administrateur, Commission → full
+  - SOUTENANCE : Administrateur, Commission → full
+  - ENV_ENSEIGNANT : Administrateur → full, autres → view
+  - PROFIL : Tous les groupes → viewEdit
+
+4.5 Feature definitions (lignes 67-1056)
+  Environ 50+ features définies via $addFeature().
+  Chaque feature contient :
+  - slug : identifiant unique (ex: 'dashboard', 'gestion_utilisateurs')
+  - code : code système (ex: 'ADM_DASHBOARD')
+  - label : libellé affiché
+  - category_code : catégorie d'appartenance
+  - menu_url : URL du menu (?page=...)
+  - existing_codes : codes alternatifs pour compatibilité
+  - routes : patterns de route avec méthode et action CRUD
+  - permissions : matrice groupe → capacités
+
+4.6 Param CRUD generator (lignes 89-125)
+  $paramCrud() génère des features pour les écrans de paramétrage CRUD.
+  ~25+ écrans de paramétrage générés via cette fonction.
+
+Exemples de features importantes :
+- dashboard (ADM_DASHBOARD)
+- gestion_utilisateurs (SYS_UTILISATEURS) — Admin uniquement
+- piste_audit (SYS_AUDIT) — Admin uniquement
+- sauvegarde_restauration (SYS_BACKUP) — Admin uniquement
+- gestion_rh (GESTION_RH) — Admin + Secrétaire
+- candidature_soutenance — Etudiant + Admin
+- gestion_rapports — multiples groupes
+- gestion_reclamations — Etudiant
+- notes_resultats — Etudiant
+
+
+5. AUTHORIZATIONSERVICE — app/Security/AuthorizationService.php
+==============================================================
+
+Namespace : CheckMaster\Security
+Classe    : AuthorizationService (final)
+
+Moteur principal d'autorisation. Reçoit une connexion PDO via le constructeur.
+
+Caches statiques :
+- $resolveCache : cache des résolutions de requêtes (clé MD5 des params)
+- $featureCache : cache des features trouvées
+- $permissionCache : cache des permissions par groupe+feature
+
+Méthodes principales :
+
+resolveLegacyRequest(array $get, array $post, string $method): array
+  Résout une requête legacy en un contexte d'autorisation :
+  1. Appelle RouteActionResolver::resolve()
+  2. Recherche la feature par id_fonctionnalite ou slug_permission
+  3. Fallback sur le paramètre page
+  4. Retourne : pattern, action, reason, is_public, id_fonctionnalite,
+     slug_permission, fonctionnalite
+
+canAccessLegacyRequest(int $groupId, array $get, array $post, string $method): bool
+  Vérifie si un groupe peut accéder à une requête :
+  1. Vérifie que groupId > 0
+  2. Si route publique → true
+  3. Sinon → checkPermissionByFeatureId()
+
+canAccessLegacyPage(int $groupId, string $pageSlug, string $action): bool
+  Vérifie l'accès par slug de page directement.
+
+checkFeaturePermission(int $groupId, ?string $identifier, string $action): bool
+  Vérifie une permission par identifiant (slug, code, ou page).
+
+checkPermissionByFeatureId(int $groupId, int $featureId, string $action): bool
+  Vérifie la permission effective :
+  1. Charge la permission depuis Permission::getPermissions()
+  2. Vérifie le champ correspondant à l'action :
+     - 'voir'     → peut_voir
+     - 'creer'    → peut_creer
+     - 'modifier' → peut_modifier
+     - 'supprimer'→ peut_supprimer
+
+
+6. ROUTEACTIONRESOLVER — app/Security/RouteActionResolver.php
+============================================================
+
+Namespace : CheckMaster\Security
+Classe    : RouteActionResolver (final)
+
+Résout les patterns de route à partir des paramètres GET/POST.
+
+buildLegacyRoutePatterns(array $get, array $post, string $method): array
+  Génère des combinaisons de patterns :
+  1. Extrait page=X
+  2. Détecte l'action via resolveActionToken()
+  3. Extrait tab=Y et extra tokens
+  4. Génère toutes les combinaisons possibles (7 patterns max)
+     Exemple : page=gestion_utilisateurs&action=btn_add_utilisateur&tab=liste
+
+resolve(PDO $pdo, array $get, array $post, string $method): array
+  Algorithme de résolution en 3 étapes :
+  1. Pour chaque pattern généré :
+     a. Vérifie PermissionRegistry::isPublicRoute()
+     b. Interroge la table route_actions en base
+  2. Si trouvé en DB → retourne l'action et le feature ID
+  3. Fallback → LegacyActionResolver::resolve()
+
+queryRouteAction(PDO $pdo, string $pattern, string $method): ?array
+  Requête SQL sur la table route_actions avec JOIN sur fonctionnalites.
+  Deux tentatives : avec puis sans les colonnes optionnelles.
+
+resolveActionToken(array $get, array $post, string $method): ?string
+  Détecte l'action depuis :
+  1. $_GET['action'] ou $_POST['action']
+  2. $_GET['modalAction'] ou $_POST['modalAction']
+  3. Marqueurs POST spécifiques :
+     - btn_add_utilisateur → action=btn_add_utilisateur
+     - btn_modifier_utilisateur → action=btn_modifier_utilisateur
+     - submit_add_etudiant → action=submit_add_etudiant
+     - submit_modifier_etudiant → action=submit_modifier_etudiant
+     - btn_add_enseignant → action=btn_add_enseignant
+     - btn_modifier_enseignant → action=btn_modifier_enseignant
+     - btn_add_pers_admin → action=btn_add_pers_admin
+     - btn_modifier_pers_admin → action=btn_modifier_pers_admin
+     - submit_delete_multiple → action=submit_delete_multiple
+     - btn_enregistrer_notes → action=btn_enregistrer_notes
+     - valider/rejeter → action=valider/rejeter
+     - update_password → action=update_password
+  4. selected_ids → action=selected_ids
+  5. nouveau_statut → action=repondre_reclamation
+
+resolveExtraToken(array $get): ?string
+  Détecte les tokens extra : detail, fichier, export, download, preview, examiner.
+
+
+7. LEGACYACTIONRESOLVER — app/Security/LegacyActionResolver.php
+==============================================================
+
+Namespace : CheckMaster\Security
+Classe    : LegacyActionResolver (final)
+
+Résout l'action CRUD pour les pages critiques via un mapping déclaratif.
+
+resolve(string $page, array $get, array $post, string $method): array
+  1. Vérifie le mapping déclaratif pour la page
+  2. Fallback sur les indices POST (create/edit/delete hints)
+  3. Fallback sur le paramètre GET action
+  4. Par défaut → 'voir'
+
+Mapping déclaratif des pages critiques :
+
+page                      | Conditions                      | Action   | Reason
+--------------------------|---------------------------------|----------|---------------------------
+gestion_utilisateurs      | POST + btn_add_utilisateur      | creer    | gestion_utilisateurs:create
+gestion_utilisateurs      | POST + btn_modifier_utilisateur | modifier | gestion_utilisateurs:update
+sauvegarde_restauration   | POST                            | modifier | sauvegarde_restauration:post
+gestion_rapports          | GET action=creer_rapport        | creer    | gestion_rapports:create_action
+gestion_rapports          | POST                            | modifier | gestion_rapports:post
+candidature_soutenance    | POST                            | creer    | candidature_soutenance:post
+gestion_reclamations      | POST                            | creer    | gestion_reclamations:post
+gestion_scolarite         | POST                            | modifier | gestion_scolarite:post
+gestion_notes_evaluations | POST                            | modifier | gestion_notes_evaluations:post
+
+Détection POST hints (si pas de mapping déclaratif) :
+- Create hints : btn_add, btn_create, submit_add, submit_create, submit_ajouter
+- Edit hints   : btn_modifier, btn_update, submit_edit, submit_update
+- Delete hints : btn_delete, submit_delete, submit_supprimer, submit_delete_multiple
+
+
+8. DBRATELIMITER — app/Security/DbRateLimiter.php
+=================================================
+
+Namespace : CheckMaster\Security
+Classe    : DbRateLimiter (final)
+
+Rate limiter basé sur la table auth_rate_limits. Design fail-open (si la
+table n'existe pas ou qu'une erreur survient, l'accès est autorisé).
+
+Méthodes :
+
+isAllowed(string $action, string $ip, string $identifier): bool
+  Vérifie si l'action est autorisée :
+  1. Recherche dans auth_rate_limits
+  2. Si blocked_until existe et est dans le futur → refusé
+  3. Sinon → autorisé
+
+hit(string $action, string $ip, string $identifier,
+    int $maxAttempts, int $windowSeconds, int $blockSeconds): void
+  Enregistre une tentative :
+  1. Lit l'état actuel
+  2. Réinitialise si la fenêtre est expirée
+  3. Incrémente attempts
+  4. Si attempts >= maxAttempts → applique blocked_until
+  5. Upsert dans la table
+
+reset(string $action, string $ip, string $identifier): void
+  Supprime l'enregistrement (appelé après un login réussi).
+
+Paramètres typiques pour le login :
+- maxAttempts : 5
+- windowSeconds : 900 (15 minutes)
+- blockSeconds : 600 (10 minutes)
+
+
+9. PERMISSIONMIDDLEWARE — app/middlewares/PermissionMiddleware.php
+=================================================================
+
+Classe sans namespace (chargée via require_once).
+
+Méthodes :
+
+checkPageAccess($page, $idGroupe, $action = 'voir'): bool
+  Vérifie l'accès à une page :
+  1. Si page vide → prend $_GET['page']
+  2. Vérifie si c'est une route publique
+  3. Délègue à AuthorizationService::checkFeaturePermission()
+
+requirePermission($page, $idGroupe, $action = 'voir')
+  Vérifie et redirige vers access_denied si refusé.
+  Message d'erreur adapté à l'action.
+
+detectAction(): string
+  Détecte l'action courante via resolveLegacyRequest().
+
+denyAccess($action = 'voir')
+  Redirige vers layout.php?page=access_denied avec message d'erreur
+  dans $_SESSION['error_message'].
+
+checkPermissionByCode($codeFonctionnalite, $idGroupe, $action): bool
+  Vérifie par code fonctionnalité.
+
+isAdminGroup(int $idGroupe): bool
+  Vérifie si le groupe est 'administrateur' (ID 5).
+
+logUnauthorizedAccess($idUtilisateur, $page, $action)
+  Journalise un accès non autorisé via AuditLog::logAction().
+
+
+10. PERMISSION HELPERS — app/utils/permissions_helper.php
+=========================================================
+
+Fonctions globales de compatibilité pour les permissions.
+
+Fonctions principales :
+
+canView($codeFonctionnalite = null): bool
+canCreate($codeFonctionnalite = null): bool
+canEdit($codeFonctionnalite = null): bool
+canDelete($codeFonctionnalite = null): bool
+  Vérifient une permission CRUD pour le groupe de l'utilisateur connecté
+  ($_SESSION['id_GU']).
+
+showIfCan($action, $buttonHtml, $codeFonctionnalite = null): string
+  Retourne le HTML du bouton si l'utilisateur a la permission, sinon ''.
+  Actions supportées : creer/create, modifier/edit, supprimer/delete, voir/view.
+
+showNoPermissionMessage($action, $codeFonctionnalite = null): string
+  Retourne un message HTML d'erreur de permission.
+
+getCurrentPermissions($codeFonctionnalite = null): array
+  Retourne ['peut_voir' => bool, 'peut_creer' => bool, ...].
+
+getPermissionCaps($codeFonctionnalite = null): array
+  Retourne ['view' => bool, 'create' => bool, 'edit' => bool,
+            'delete' => bool, 'slug' => string].
+
+isAdmin(): bool
+  Vérifie si l'utilisateur connecté est dans le groupe administrateur.
+
+Helpers internes :
+- cm_authorization_service(): AuthorizationService (singleton)
+- cm_permission_context_factory(): PermissionContextFactory (singleton)
+- cm_current_permission_identifier(): string
+
+
+11. PERMISSIONCONTEXTFACTORY — app/Security/PermissionContextFactory.php
+=======================================================================
+
+Namespace : CheckMaster\Security
+Classe    : PermissionContextFactory (final)
+
+Fabrique de contextes de permission.
+
+forFeature(int $groupId, ?string $identifier): array
+  Retourne les capacités pour un groupe et une feature :
+  ['view' => bool, 'create' => bool, 'edit' => bool,
+   'delete' => bool, 'slug' => string]
+
+forCurrentRequest(int $groupId, array $get, array $post, string $method): array
+  Résout d'abord la requête, puis retourne les capacités.
+
+
+12. ROUTES PUBLIQUES (sans authentification)
+============================================
+
+Routes définies dans permission_registry.php :
+  page=login                (GET/POST)
+  page=access_denied        (GET)
+  page=password_reset       (GET/POST)
+
+
+13. DONNÉES SESSION APRÈS CONNEXION
+====================================
+
+Populées par AuthService::login() :
+
+Variables communes :
+- $_SESSION['id_utilisateur']     → ID utilisateur
+- $_SESSION['login_utilisateur']  → Login
+- $_SESSION['nom_utilisateur']    → Nom
+- $_SESSION['statut_utilisateur'] → Statut du compte
+- $_SESSION['type_utilisateur']   → Type (Etudiant, Enseignant, etc.)
+- $_SESSION['id_GU']              → ID du groupe utilisateur
+- $_SESSION['lib_GU']             → Libellé du groupe
+- $_SESSION['niveau_acces']       → Niveau d'accès
+
+Variables spécifiques Enseignant :
+- $_SESSION['specialite']
+- $_SESSION['grade']
+- $_SESSION['fonction']
+- $_SESSION['date_grade']
+- $_SESSION['date_fonction']
+
+Variables spécifiques Personnel administratif :
+- $_SESSION['telephone']
+- $_SESSION['poste']
+- $_SESSION['date_embauche']
+
+Variables spécifiques Etudiant :
+- $_SESSION['num_etu']    → Numéro carte étudiant
+- $_SESSION['nom_etu']    → Nom
+- $_SESSION['prenom_etu'] → Prénom
+
+
+14. FLUX DE VÉRIFICATION DES PERMISSIONS
+=========================================
+
+Request
+  ↓
+RouteActionResolver::resolve()
+  ↓
+  ├─ isPublicRoute()? ──OUI──→ Autorisé (pas de vérification)
+  │
+  ├─ route_actions DB match? ──→ action + feature ID
+  │
+  └─ LegacyActionResolver::resolve() ──→ action par défaut
+  ↓
+AuthorizationService::canAccessLegacyRequest(groupId, GET, POST, method)
+  ↓
+  ├─ is_public? ──OUI──→ Autorisé
+  │
+  └─ checkPermissionByFeatureId(groupId, featureId, action)
+      ↓
+      Permission model → SELECT FROM permissions
+      ↓
+      Vérifie peut_voir/peut_creer/peut_modifier/peut_supprimer
+      ↓
+      Autorisé / Refusé → redirect access_denied
+
+
+================================================================================
+  FIN DE LA DOCUMENTATION SÉCURITÉ ET PERMISSIONS
+================================================================================

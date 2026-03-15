@@ -1,0 +1,180 @@
+# PRD-10 - Plan de migration, QA, deploiement et gouvernance
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-01 a PRD-09
+- Portee: execution, qualite, rollout, gouvernance
+
+## Resume executif
+Ce PRD definit comment livrer la refonte backend en continu, sans rupture fonctionnelle, avec une strategie de migration progressive, un plan QA complet et une gouvernance de release stricte.
+
+## Objectifs
+1. Executer la refonte sans interruption majeure de service.
+2. Garantir la non-regression fonctionnelle.
+3. Industrialiser les controles qualite et securite.
+4. Piloter les risques de migration par lot.
+
+## Contraintes non negociables
+1. Aucun changement schema BDD a aucun stade.
+2. Fonctionnalites actuelles maintenues en permanence.
+3. Pas de bascule big-bang.
+4. Rollback possible a chaque lot.
+
+## Strategie de migration
+### Approche
+- Mode strangler:
+  - nouveaux composants introduces derriere interfaces.
+  - anciens services conserves temporairement comme adaptateurs.
+- Feature flags backend pour activer module par module.
+
+### Lots recommandes
+1. Socle technique (DI/routage/base controller)
+2. Couche data repository/query builder
+3. Validation et normalisation
+4. Workflows metier prioritaires
+5. Securite et audit durcis
+6. Optimisation performance finale
+
+## Plan QA detaille
+### 1) Tests unitaires
+- Services metier
+- Repositories
+- Validation rules
+- Security policies
+
+### 2) Tests integration
+- Parcours etudiant complet
+- Parcours commission complet
+- Parcours scolarite complet
+- Parcours admin parametres/permissions
+
+### 3) Tests de non regression
+- Matrice routes legacy `page/action`.
+- Verifications outputs vues et JSON.
+- Comparaison comportement avant/apres.
+
+### 4) Tests performance
+- Endpoints dashboard
+- Listes paginees (etudiants, rapports, archives)
+- Exports CSV/PDF
+
+### 5) Tests securite
+- Auth/RBAC
+- CSRF
+- Rate limit
+- Escalade privilege
+
+## Gouvernance et roles
+- Product owner: valide priorites metier et criteres d'acceptation.
+- Lead backend: valide design technique PRD.
+- QA lead: pilote campagne regression.
+- Security lead: valide controles securite.
+- Release manager: pilote deploiements progressifs.
+
+## Rituels de pilotage
+- Revue architecture hebdomadaire.
+- Revue qualite/test par lot.
+- Revue securite par increment.
+- Go/No-Go release avec checklist standard.
+
+## Checklist Go/No-Go
+1. Tous tests critiques verts.
+2. Aucun ecart schema BDD.
+3. Logs/monitoring operationnels.
+4. Rollback script et procedure verifies.
+5. Validation metier des parcours prioritaires.
+
+## Plan de rollback
+- Desactivation feature flag du lot courant.
+- Retour vers adaptateur legacy.
+- Verification coherence donnees post-rollback.
+- Rapport incident + plan correctif.
+
+## Livrables obligatoires par lot
+- Code + tests.
+- Notes de migration technique.
+- Matrice de non regression executee.
+- Rapport de performance et securite.
+- Mise a jour documentation technique.
+
+## Exigences fonctionnelles (FR)
+- FR-10-01: chaque lot doit etre deployable independamment.
+- FR-10-02: chaque lot doit avoir un rollback valide.
+- FR-10-03: chaque lot doit produire un rapport QA.
+- FR-10-04: toutes les equipes doivent disposer de la meme matrice de verif.
+
+## Exigences techniques (NFR)
+- NFR-10-01: pipeline CI avec tests automatiques obligatoires.
+- NFR-10-02: traçabilite des releases et incidents.
+- NFR-10-03: observabilite active (logs, erreurs, latence).
+- NFR-10-04: documentation synchronisee avec le code.
+
+## Tables critiques a surveiller pendant migration
+- `inscriptions` (cle composite et flux paiements)
+- `rapport_etudiants`, `deposer`, `valider`, `evaluations_rapports`
+- `programmer_soutenance`, `enseignant_jury`, `notes`
+- `utilisateur`, `permissions`, `route_actions`
+- `pister`, `document_genere`
+
+## Criteres d'acceptation globaux
+- 10 PRD executes sans rupture majeure.
+- Zero migration schema.
+- Stabilite fonctionnelle des parcours documentes dans `docs3`.
+- Backend plus lisible, testable et maintenable.
+
+## Risques et mitigations
+- Risque: accumulation de dette pendant transition.  
+  Mitigation: suppression planifiee des adaptateurs legacy.
+- Risque: derive de scope.  
+  Mitigation: validation stricte perimetre PRD par lot.
+- Risque: couverture tests insuffisante.  
+  Mitigation: gate CI bloquant sous seuil defini.
+
+## Definition of done
+- Roadmap executee par increments valides.
+- Qualite et securite verifiees en continu.
+- Documentation finale complete et exploitable par l'equipe.
+
+## Annexe detaillee J - gate de release, RACI et decision rollback
+
+### Gates obligatoires par lot
+1. Gate architecture: conformite couches + conventions.
+2. Gate qualite: tests unitaires/integration/non-regression verts.
+3. Gate securite: checklist PRD-09 validee.
+4. Gate exploitation: logs/monitoring/alerting actifs.
+5. Gate metier: validation fonctionnelle des parcours cibles.
+
+### RACI simplifie
+| Activite | Responsable | Approbateur | Contributeurs |
+|---|---|---|---|
+| Design technique lot | Lead backend | Architecte | dev backend |
+| Validation metier | Product owner | Sponsor metier | QA, key users |
+| Validation securite | Security lead | CTO/DSI | backend lead |
+| Deploiement | Release manager | CTO/DSI | DevOps, QA |
+
+### Arbre de decision rollback
+- Defaut critique securite? -> rollback immediat.
+- Regression fonctionnelle bloquante? -> rollback lot.
+- Degradation performance severe? -> rollback conditionnel + analyse rapide.
+- Incident mineur non bloquant? -> hotfix controle, pas de rollback global.
+
+### Definition of ready (DoR) pour chaque lot
+- Scope givre et valide.
+- Critere d'acceptation ecrit.
+- Cas de tests cibles ecrits.
+- Risques identifies + mitigation associee.
+
+### Definition of done (DoD) pour chaque lot
+- Code revu et conforme architecture.
+- Tests auto verts + rapport QA.
+- Monitoring configure.
+- Documentation technique mise a jour.
+- Validation metier signee.
+
+### Checklist finale programme
+- [ ] Tous les PRD enrichis et coherents.
+- [ ] Aucun ecart schema BDD.
+- [ ] Composants imposes couverts.
+- [ ] Plan de rollback teste.
+- [ ] Equipes formees sur la nouvelle architecture.

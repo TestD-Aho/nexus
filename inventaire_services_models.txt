@@ -1,0 +1,710 @@
+================================================================================
+INVENTAIRE DES SERVICES ET MODELS - CHECKMASTER UFRMI
+================================================================================
+Document: 11_services_models_inventory.txt
+Version: 1.0
+Date: 2026-03-14
+Description: Inventaire complet de tous les services et models du systeme.
+
+================================================================================
+SOMMAIRE
+================================================================================
+
+  PARTIE A: SERVICES (42 services)
+    A.1 Services d'authentification et securite
+    A.2 Services de tableau de bord
+    A.3 Services de gestion etudiants
+    A.4 Services de gestion utilisateurs
+    A.5 Services de scolarite et inscription
+    A.6 Services de notes et resultats
+    A.7 Services de parametres
+    A.8 Services de candidature et soutenance
+    A.9 Services de rapports
+    A.10 Services de validation et evaluation
+    A.11 Services de programmation et planification
+    A.12 Services de generation de documents
+    A.13 Services RH et salles
+    A.14 Services de criteres d'evaluation
+    A.15 Services de menu et permissions
+    A.16 Services d'archivage
+    A.17 Services de reclamation
+    A.18 Services d'audit et sauvegarde
+    A.19 Services de repertoire enseignant
+    A.20 Services utilitaires
+
+  PARTIE B: MODELS (49 models)
+    B.1 Models alphabetiques
+
+================================================================================
+PARTIE A: SERVICES
+================================================================================
+
+--------------------------------------------------------------------------------
+A.1 SERVICES D'AUTHENTIFICATION ET SECURITE
+--------------------------------------------------------------------------------
+
+AuthService (203 lignes)
+  Fichier: app/Services/AuthService.php
+  Dependances: Utilisateur, Enseignant, PersAdmin, Etudiant, AuditLog, DbRateLimiter
+  Tables: utilisateur, enseignants, personnel_admin, etudiants, audit_log
+  Methodes:
+    - login($login, $password, $ip): Authentification avec rate limiting
+    - logout($userId): Deconnexion et session cleanup
+    - updatePassword($userId, $oldPassword, $newPassword): Changement mot de passe
+    - getCurrentUser(): Recuperation de l'utilisateur courant
+
+RoutePermissionService
+  Fichier: app/Security/RoutePermissionService.php
+  Dependances: PermissionRegistry, Database
+  Tables: permissions, fonctions, categories
+  Methodes:
+    - checkRouteAccess($route, $userId): Verification d'acces a une route
+
+AuthorizationService
+  Fichier: app/Security/AuthorizationService.php
+  Dependances: PermissionContextFactory, Database
+  Tables: permissions, groupes_utilisateurs, type_utilisateur
+  Methodes:
+    - resolveLegacyRequest($get, $post, $method): Resolution des permissions
+    - hasPermission($identifier, $userId): Verification permission
+
+PermissionRegistry
+  Fichier: app/Security/PermissionRegistry.php
+  Fichier config: app/config/permission_registry.php (1056 lignes)
+  Description: Registre centralise des 9 groupes et 50+ fonctionnalites
+
+RouteActionResolver
+  Fichier: app/Security/RouteActionResolver.php
+  Methodes:
+    - queryRouteAction($route): Mapping route -> action DB
+
+DbRateLimiter
+  Fichier: app/Security/DbRateLimiter.php
+  Tables: rate_limits
+  Methodes:
+    - isAllowed($action, $ip, $identifier): Limiteur de taux
+
+--------------------------------------------------------------------------------
+A.2 SERVICES DE TABLEAU DE BORD
+--------------------------------------------------------------------------------
+
+DashboardService (289 lignes)
+  Fichier: app/Services/DashboardService.php
+  Dependances: Utilisateur, Etudiant, Enseignant, PersAdmin, AuditLog
+  Tables: utilisateur, etudiants, enseignants, personnel_admin, audit_log
+  Methodes:
+    - getGlobalStats(): Statistiques globales (etudiants, enseignants, personnel)
+    - populateDashboardGlobals(): Variables globales pour les vues
+    - getDetailedStats(): Statistiques avec taux d'activite
+    - getRecentActivities(): Activites recentes
+    - getEvolutionData(): Donnees d'evolution pour graphiques
+
+DashboardScolariteService (173 lignes)
+  Fichier: app/Services/DashboardScolariteService.php
+  Dependances: Etudiant, Scolarite, Inscription
+  Tables: etudiants, inscriptions, reclamations
+  Methodes:
+    - getDashboardData(): Donnees du dashboard scolarite
+    - loadReclamationStats(): Statistiques des reclamations
+    - loadPaiementStats(): Statistiques des paiements
+
+DashboardEnseignantService (154 lignes)
+  Fichier: app/Services/DashboardEnseignantService.php
+  Dependances: Enseignant, Etudiant, NiveauEtude
+  Tables: enseignants, etudiants, niveaux_etude
+  Methodes:
+    - getGlobalStats(): Statistiques globales enseignant
+    - getNiveauxByEnseignant($enseignantId): Niveaux assigns
+
+DashboardCommissionService (527 lignes)
+  Fichier: app/Services/DashboardCommissionService.php
+  Dependances: RapportEtudiant, EvaluationRapport
+  Tables: rapport_etudiants, evaluations_rapports, valider, approuver
+  Methodes:
+    - getDashboardData(): Donnees du dashboard commission
+    - getTauxValidation(): Taux de validation des rapports
+    - getTempsMoyenTraitement(): Temps moyen de traitement
+    - rapportDateExpr(): Expression SQL compatible (date_rapport vs date_redaction_rapport)
+    - rapportTitleExpr(): Expression SQL compatible (nom_rapport vs theme_rapport)
+
+DashboardSecretaireService (312 lignes)
+  Fichier: app/Services/DashboardSecretaireService.php
+  Dependances: Etudiant, Enseignant
+  Tables: etudiants, enseignants, personnel_admin
+  Methodes:
+    - getDashboardData(): Donnees du dashboard secretaire
+    - getStats(): Statistiques
+    - getActivitesRecentes(): Activites recentes
+
+--------------------------------------------------------------------------------
+A.3 SERVICES DE GESTION ETUDIANTS
+--------------------------------------------------------------------------------
+
+GestionEtudiantService (522 lignes)
+  Fichier: app/Services/GestionEtudiantService.php
+  Dependances: Etudiant, AuditLog, AcademicYear
+  Tables: etudiants, inscriptions, audit_log, annee_academique
+  Methodes:
+    - ajouterEtudiant($data): Creation d'un etudiant
+    - modifierEtudiant($id, $data): Modification d'un etudiant
+    - supprimerEtudiants($ids): Suppression en masse
+    - getEtudiants($filters): Liste avec filtres
+    - getEtudiantById($id): Detail d'un etudiant
+    - getStatistiques(): Statistiques etudiants
+    - exportEtudiants($format): Export (CSV/Excel)
+
+EtudiantService (167 lignes)
+  Fichier: app/Services/EtudiantService.php
+  Dependances: Etudiant
+  Tables: etudiants, inscriptions
+  Methodes:
+    - ajouterEtudiant($data): Creation basique
+    - modifierEtudiant($id, $data): Modification basique
+    - getEtudiantByMatricule($matricule): Recherche par matricule
+    - getEtudiantsByNiveau($niveau): Etudiants par niveau
+
+--------------------------------------------------------------------------------
+A.4 SERVICES DE GESTION UTILISATEURS
+--------------------------------------------------------------------------------
+
+GestionUtilisateurService (705 lignes)
+  Fichier: app/Services/GestionUtilisateurService.php
+  Dependances: Utilisateur, TypeUtilisateur, GroupeUtilisateur, NiveauAccesDonnees, AuditLog
+  Tables: utilisateur, type_utilisateur, groupes_utilisateurs, niveau_acces_donnees,
+          password_resets, audit_log
+  Methodes:
+    - addUtilisateur($data): Ajout d'un utilisateur
+    - addUtilisateursEnMasse($csvData): Ajout en masse depuis CSV
+    - modifierUtilisateur($id, $data): Modification
+    - activerDesactiverUtilisateur($id, $status): Activation/desactivation
+    - envoyerAccesParEmail($userId): Envoi des acces par email
+    - genererMotDePasse(): Generation aleatoire
+    - createPasswordResetToken($email): Token de reset
+    - getReferenceLists(): Listes de reference pour les vues
+    - checkLoginAvailable($login): Verification disponibilite login
+
+--------------------------------------------------------------------------------
+A.5 SERVICES DE SCOLARITE ET INSCRIPTION
+--------------------------------------------------------------------------------
+
+GestionScolariteService (470 lignes)
+  Fichier: app/Services/GestionScolariteService.php
+  Dependances: Scolarite, AnneeAcademique
+  Tables: scolarite, versements, inscriptions, annee_academique
+  Methodes:
+    - enregistrerVersement($data): Enregistrement d'un versement
+    - enregistrerPaiement($data): Enregistrement paiement
+    - getVersements($filters): Liste des versements
+    - genererRecu($versementId): Generation du recu
+    - getStatistiquesPaiement(): Statistiques paiements
+
+InscriptionService (293 lignes)
+  Fichier: app/Services/InscriptionService.php
+  Dependances: Scolarite, AnneeAcademique
+  Tables: inscriptions, versements, echeances, etudiants, annee_academique
+  Methodes:
+    - traiterInscription($data): Traitement d'une inscription
+    - modifierInscription($id, $data): Modification
+    - creerEcheancesSiNecessaire($inscriptionId): Creation echeances
+    - getInscriptions($filters): Liste des inscriptions
+    - getInscriptionById($id): Detail inscription
+
+--------------------------------------------------------------------------------
+A.6 SERVICES DE NOTES ET RESULTATS
+--------------------------------------------------------------------------------
+
+NotesService (153 lignes)
+  Fichier: app/Services/NotesService.php
+  Dependances: Note, Etudiant
+  Tables: notes, etudiants, inscriptions
+  Methodes:
+    - enregistrerNotes($data): Enregistrement des notes
+    - getNotesByEtudiant($numEtu): Notes d'un etudiant
+    - calculerMoyenne($notes): Calcul de moyenne
+    - validerNotes($notes): Validation des notes
+
+NotesResultatsService (182 lignes)
+  Fichier: app/Services/NotesResultatsService.php
+  Dependances: Note, Etudiant
+  Tables: notes, etudiants, niveaux_etude
+  Methodes:
+    - getNotes($filters): Recuperation avec filtres
+    - generatePdf($data): Generation PDF des resultats
+    - getStatistiques(): Statistiques des notes
+    - getClassement(): Classement des etudiants
+
+--------------------------------------------------------------------------------
+A.7 SERVICES DE PARAMETRES
+--------------------------------------------------------------------------------
+
+ParametreService (2064 lignes - le plus volumineux)
+  Fichier: app/Services/ParametreService.php
+  Dependances: 17+ models (Action, AnneeAcademique, Fonction, Grade,
+              GroupeUtilisateur, NiveauAccesDonnees, NiveauApprobation,
+              Specialite, StatutJury, TypeUtilisateur, NiveauEtude,
+              Semestre, Traitement, Entreprise, Message, Attribution,
+              Enseignant, AuditLog)
+  Tables: 17+ tables de reference
+  Methodes (19+ gestionXxx() methods):
+    - gestionActions(): CRUD actions
+    - gestionAnneesAcademiques(): CRUD annees academiques
+    - gestionFonctions(): CRUD fonctions
+    - gestionGrades(): CRUD grades
+    - gestionGroupesUtilisateurs(): CRUD groupes
+    - gestionNiveauxAcces(): CRUD niveaux acces
+    - gestionNiveauxApprobation(): CRUD niveaux approbation
+    - gestionSpecialites(): CRUD specialites
+    - gestionStatutsJury(): CRUD statuts jury
+    - gestionTypesUtilisateur(): CRUD types utilisateur
+    - gestionNiveauxEtude(): CRUD niveaux etude
+    - gestionSemestres(): CRUD semestres
+    - gestionTraitements(): CRUD traitements
+    - gestionEntreprises(): CRUD entreprises
+    - gestionMessages(): CRUD messages
+    - gestionAttributions(): CRUD attributions
+    - ... et autres
+
+--------------------------------------------------------------------------------
+A.8 SERVICES DE CANDIDATURE ET SOUTENANCE
+--------------------------------------------------------------------------------
+
+CandidatureSoutenanceService (220 lignes)
+  Fichier: app/Services/CandidatureSoutenanceService.php
+  Dependances: Etudiant, Entreprise, InfoStage, MaitreDeStage, AuditLog
+  Tables: etudiants, entreprises, informations_stage, maitres_de_stage,
+          candidature_soutenance, audit_log
+  Methodes:
+    - soumettreCandidature($etudiantId, $userId): Soumission candidature
+    - enregistrerInfoStage(...): Enregistrement info stage
+    - getStageInfo($numEtu): Recuperation info stage
+    - getCandidature($numEtu): Candidature courante
+    - getCandidatures($numEtu): Toutes candidatures
+    - getAllEntreprises(): Liste entreprises
+    - getAllMaitresDeStage(): Liste maitres de stage
+
+GestionCandidaturesService (327 lignes)
+  Fichier: app/Services/GestionCandidaturesService.php
+  Dependances: Etudiant, Scolarite, PersAdmin, EmailService
+  Tables: candidature_soutenance, etudiants, scolarite, personnel_admin
+  Methodes:
+    - envoyerResultatsFinaux($candidatureId): Envoi resultats
+    - buildScolariteData($etudiantId): Construction donnees scolarite
+    - getCandidatures($filters): Liste avec filtres
+    - validerCandidature($id): Validation
+    - rejeterCandidature($id, $motif): Rejet
+
+GestionDossiersCandidaturesService (477 lignes)
+  Fichier: app/Services/GestionDossiersCandidaturesService.php
+  Dependances: RapportEtudiant, Etudiant, Approuver
+  Tables: rapport_etudiants, etudiants, approuver, informations_stage
+  Methodes:
+    - getRapportsVerifies($filters): Rapports verifies
+    - getStatistiques(): Statistiques dossiers
+    - getDossierDetail($id): Detail d'un dossier
+    - getHistorique($etudiantId): Historique des dossiers
+
+EvaluationSoutenanceService (1197 lignes)
+  Fichier: app/Services/EvaluationSoutenanceService.php
+  Dependances: CritereEvaluation, AcademicYear
+  Tables: evaluer, critere_evaluation, bareme_critere, programmer_soutenance,
+          enseignant_jury, qualite_jury/roles_jury, notes
+  Methodes:
+    - enregistrerEvaluation($data): Enregistrement evaluation
+    - supprimerEvaluation($data): Suppression evaluation
+    - getDonneesPV($soutenanceId): Donnees pour PV
+    - calculerMention($note): Calcul mention
+    - getProgrammationTable(): Detection table (programmer vs programmer_soutenance)
+    - getJuryTable(): Detection table (composer_jury vs enseignant_jury)
+    - getRolesTable(): Detection table (qualite_jury vs roles_jury)
+
+--------------------------------------------------------------------------------
+A.9 SERVICES DE RAPPORTS
+--------------------------------------------------------------------------------
+
+GestionRapportService (1148 lignes)
+  Fichier: app/Services/GestionRapportService.php
+  Dependances: RapportEtudiant, Etudiant, Approuver, AuditLog, InfoStage, Entreprise
+  Tables: rapport_etudiants, etudiants, informations_stage, entreprises,
+          approuver, deposer, candidature_soutenance
+  Methodes:
+    - sauvegarderRapport($data): Sauvegarde brouillon
+    - enregistrerDepotRapport($rapportId, $etudiantId): Depot officiel
+    - getRapports($filters): Liste des rapports
+    - getRapportById($id): Detail rapport
+    - getStatistiques($etudiantId): Statistiques etudiant
+    - getStatistiquesGlobales(): Statistiques globales
+    - getCommentairesEvaluateurs($rapportId): Commentaires
+    - exportPdf($rapportId): Export PDF
+
+VerificationRapportsService (358 lignes)
+  Fichier: app/Services/VerificationRapportsService.php
+  Dependances: RapportEtudiant, Approuver, PersAdmin, AuditLog
+  Tables: rapport_etudiants, approuver, personnel_admin, audit_log
+  Methodes:
+    - validerRapport($idRapport, $idVerificateur): Approbation
+    - rejeterRapport($idRapport, $idVerificateur, $motif): Rejet
+    - getRapportsDeposes(): Rapports en attente de verification
+    - getDetailsRapport($idRapport): Details avec historique
+
+--------------------------------------------------------------------------------
+A.10 SERVICES DE VALIDATION ET EVALUATION
+--------------------------------------------------------------------------------
+
+ProcessusValidationService (565 lignes)
+  Fichier: app/Services/ProcessusValidationService.php
+  Dependances: EvaluationRapport, Approuver
+  Tables: evaluations_rapports, valider, approuver, rapport_etudiants,
+          commission_evaluation
+  Methodes:
+    - getStatistiques(): Statistiques de validation
+    - getRapportsAvecEvaluations(): Rapports avec votes
+    - finaliserRapport($idRapport): Finalisation (comptage votes)
+      - Logique: count('valider') >= 4 => valider, sinon rejeter
+    - isCommissionMember($userId): Verification membre commission
+
+EvaluationDossiersService (538 lignes)
+  Fichier: app/Services/EvaluationDossiersService.php
+  Dependances: RapportEtudiant, EvaluationRapport, Valider, AuditLog
+  Tables: rapport_etudiants, evaluations_rapports, valider, audit_log
+  Methodes:
+    - validerDossier($id, $userId): Validation d'un dossier
+    - rejeterDossier($id, $userId, $motif): Rejet d'un dossier
+    - traiterDecisionCommission($id, $decision): Traitement decision
+    - finaliserDecisionCommission($id): Finalisation decision
+    - getStatistiques(): Statistiques evaluation
+    - getDossiersAEvaluer(): Liste dossiers a evaluer
+
+RedactionCompteRenduService (239 lignes)
+  Fichier: app/Services/RedactionCompteRenduService.php
+  Dependances: Valider, CompteRendu, EmailService
+  Tables: compte_rendu, compte_rendu_rapport, valider, affecter
+  Methodes:
+    - enregistrer($data): Enregistrement CR
+    - exporterPdf($compteRenduId): Export PDF du CR
+    - getComptesRendus($filters): Liste CR
+
+--------------------------------------------------------------------------------
+A.11 SERVICES DE PROGRAMMATION ET PLANIFICATION
+--------------------------------------------------------------------------------
+
+ProgrammationSoutenanceService (859 lignes)
+  Fichier: app/Services/ProgrammationSoutenanceService.php
+  Dependances: Database, AcademicYear
+  Tables: programmer_soutenance (ou programmer), enseignant_jury (ou composer_jury),
+          qualite_jury (ou roles_jury), enseignants, etudiants
+  Methodes:
+    - createAttribution($data): Creation programmation
+    - updateAttribution($id, $data): Modification
+    - deleteAttribution($id): Suppression
+    - getAttributions($filters): Liste programmations
+    - affecterJury($soutenanceId, $jury): Affectation jury
+    - getProgrammationTable(): Detection table programmer vs programmer_soutenance
+    - getJuryTable(): Detection table composer_jury vs enseignant_jury
+    - getRolesTable(): Detection table qualite_jury vs roles_jury
+
+PlanificationSoutenanceService (519 lignes)
+  Fichier: app/Services/PlanificationSoutenanceService.php
+  Dependances: Salle, AcademicYear
+  Tables: programmer_soutenance, salles
+  Methodes:
+    - planifier($soutenanceId, $salle, $date, $heure): Planification
+    - supprimer($soutenanceId): Suppression planification
+    - getPlanifications($filters): Liste planifications
+    - detecterConflits($salle, $date, $heure): Detection conflits
+    - getSallesDisponibles($date, $heure): Salles disponibles
+
+--------------------------------------------------------------------------------
+A.12 SERVICES DE GENERATION DE DOCUMENTS
+--------------------------------------------------------------------------------
+
+PdfGeneratorService (400 lignes)
+  Fichier: app/Services/Document/PdfGeneratorService.php
+  Dependances: TCPDF
+  Methodes:
+    - createDocument($orientation, $format, $title, $author): Creation PDF
+    - addHeader($pdf, $title, $subtitle): En-tete institutionnel
+    - save($pdf, $subdir, $filename): Sauvegarde
+    - writeHtml($pdf, $html): Conversion HTML
+    - addFooter($pdf, $text): Pied de page
+    - generateReference($type, $sequence): Generation reference
+
+PvFinalGeneratorService (771 lignes)
+  Fichier: app/Services/Document/PvFinalGeneratorService.php
+  Dependances: PdfGeneratorService, PlanningDataUtils
+  Tables: programmer_soutenance, etudiants, enseignant_jury, evaluer,
+          critere_evaluation, bareme_critere, notes, sessions, salles,
+          document_genere
+  Methodes:
+    - generate($soutenanceId, $userId): Generation PV final (3 annexes)
+    - buildAnnexe1Rows($matricule): Construction tableau notes
+    - extractJuryMembers($jury): Extraction membres jury
+    - formaterDecision($decision): Formatage decision
+
+PvCommissionGeneratorService (333 lignes)
+  Fichier: app/Services/Document/PvCommissionGeneratorService.php
+  Dependances: PdfGeneratorService, PlanningDataUtils, Database
+  Tables: compte_rendu, compte_rendu_rapport, rapport_etudiants, etudiants,
+          affecter, enseignants, document_genere
+  Methodes:
+    - generate($compteRenduId, $userId): Generation PV commission
+
+RapportPdfGeneratorService (459 lignes)
+  Fichier: app/Services/Document/RapportPdfGeneratorService.php
+  Dependances: PdfGeneratorService
+  Tables: rapport_etudiants, etudiants, informations_stage, document_genere
+  Methodes:
+    - generate($rapportId, $userId): Generation PDF rapport
+
+PlanningGeneratorService (316 lignes)
+  Fichier: app/Services/Document/PlanningGeneratorService.php
+  Dependances: PdfGeneratorService, PlanningDataUtils, Database
+  Tables: programmer_soutenance, enseignant_jury, salles, document_genere
+  Methodes:
+    - generate($sessionId, $dateFrom, $dateTo, $userId): Generation planning
+
+RecuGeneratorService (321 lignes)
+  Fichier: app/Services/Document/RecuGeneratorService.php
+  Dependances: PdfGeneratorService, RecuDataUtils, Database
+  Tables: versements, inscriptions, etudiants, document_genere
+  Methodes:
+    - generate($versementId, $userId): Generation recu
+
+--------------------------------------------------------------------------------
+A.13 SERVICES RH ET SALLES
+--------------------------------------------------------------------------------
+
+GestionRhService (221 lignes)
+  Fichier: app/Services/GestionRhService.php
+  Dependances: Enseignant, PersAdmin, Grade
+  Tables: enseignants, personnel_admin, grades
+  Methodes:
+    - saveEnseignant($data): Sauvegarde enseignant
+    - savePersAdmin($data): Sauvegarde personnel admin
+    - getEnseignants($filters): Liste enseignants
+    - getPersonnelAdmin($filters): Liste personnel admin
+
+GestionSallesService (216 lignes)
+  Fichier: app/Services/GestionSallesService.php
+  Dependances: Salle
+  Tables: salles
+  Methodes:
+    - ajouterOuModifierSalle($data): Ajout/modification salle
+    - supprimerSallesMultiples($ids): Suppression en masse
+    - getSalles($filters): Liste des salles
+
+--------------------------------------------------------------------------------
+A.14 SERVICES DE CRITERES D'EVALUATION
+--------------------------------------------------------------------------------
+
+CriteresEvaluationService (398 lignes)
+  Fichier: app/Services/CriteresEvaluationService.php
+  Dependances: CritereEvaluation
+  Tables: critere_evaluation, bareme_critere
+  Methodes:
+    - createCritere($data): Creation critere
+    - updateCritere($id, $data): Modification critere
+    - validateBaremesTotaux($critereId): Validation baremes
+    - getCriteres($filters): Liste criteres
+    - supprimerCritere($id): Suppression critere
+
+--------------------------------------------------------------------------------
+A.15 SERVICES DE MENU ET PERMISSIONS
+--------------------------------------------------------------------------------
+
+MenuService (178 lignes)
+  Fichier: app/Services/MenuService.php
+  Dependances: Traitement, Categorie, Fonctionnalite, Permission
+  Tables: traitements, categories, fonctionnalites, permissions
+  Methodes:
+    - genererMenuHierarchique($userId): Generation menu selon profil
+    - verifierAcces($route, $userId): Verification acces menu
+    - getMenuItems($userId): Items de menu utilisateur
+
+--------------------------------------------------------------------------------
+A.16 SERVICES D'ARCHIVAGE
+--------------------------------------------------------------------------------
+
+ArchiveService (226 lignes)
+  Fichier: app/Services/ArchiveService.php
+  Dependances: Archive, ExcelImportService
+  Tables: archives, etudiants
+  Methodes:
+    - getIndexData(): Donnees index archives
+    - importArchiveFile($file): Import fichier archive
+    - getArchives($filters): Liste archives
+
+ArchivesDossiersSoutenanceService (294 lignes)
+  Fichier: app/Services/ArchivesDossiersSoutenanceService.php
+  Dependances: AuditLog
+  Tables: rapport_etudiants, programmer_soutenance, audit_log
+  Methodes:
+    - getRapportsArchives($annee): Rapports archives
+    - getStatistiquesArchives($annee): Statistiques archives
+    - getHistoriqueSoutenance($etudiantId): Historique
+
+ArchivesCompteRenduService (58 lignes)
+  Fichier: app/Services/ArchivesCompteRenduService.php
+  Dependances: CompteRendu
+  Tables: compte_rendu
+  Methodes:
+    - getPaginatedArchives($page, $limit): Archives paginees
+    - deleteArchive($id): Suppression archive
+
+--------------------------------------------------------------------------------
+A.17 SERVICES DE RECLAMATION
+--------------------------------------------------------------------------------
+
+GestionReclamationsService (397 lignes)
+  Fichier: app/Services/GestionReclamationsService.php
+  Dependances: Reclamation, Database
+  Tables: reclamations, statut_reclamation, type_reclamation
+  Methodes:
+    - creerReclamation($data): Creation reclamation
+    - getSuiviReclamations($etudiantId): Suivi reclamations
+    - getReclamations($filters): Liste reclamations
+    - traiterReclamation($id, $data): Traitement
+
+GestionReclamationsScolariteService (84 lignes)
+  Fichier: app/Services/GestionReclamationsScolariteService.php
+  Dependances: Reclamation
+  Tables: reclamations
+  Methodes:
+    - getReclamationsPartitionnees(): Reclamations par statut
+    - changerStatut($id, $statut): Changement statut
+
+--------------------------------------------------------------------------------
+A.18 SERVICES D'AUDIT ET SAUVEGARDE
+--------------------------------------------------------------------------------
+
+AuditService (237 lignes)
+  Fichier: app/Services/AuditService.php
+  Dependances: AuditLog, Action
+  Tables: audit_log, actions
+  Methodes:
+    - getFilteredAuditLog($filters): Log filtre
+    - exportToStream($format): Export stream
+    - cleanupLogs($olderThan): Nettoyage anciens logs
+
+SauvegardeRestaurationService (695 lignes)
+  Fichier: app/Services/SauvegardeRestaurationService.php
+  Dependances: AuditLog, Database
+  Tables: audit_log, toutes les tables (via mysqldump)
+  Methodes:
+    - createBackup($options): Creation sauvegarde
+    - restoreBackup($backupFile): Restauration
+    - listBackups(): Liste sauvegardes
+    - deleteBackup($id): Suppression sauvegarde
+
+--------------------------------------------------------------------------------
+A.19 SERVICES DE REPERTOIRE ENSEIGNANT
+--------------------------------------------------------------------------------
+
+RepertoireEnseignantService (716 lignes)
+  Fichier: app/Services/RepertoireEnseignantService.php
+  Dependances: Enseignant, AcademicYear, Database
+  Tables: enseignants, rapport_etudiants, compte_rendu, programmer_soutenance,
+          enseignant_jury, rendre
+  Methodes:
+    - getRapports($enseignantId, $annee): Rapports encadres
+    - getComptesRendus($enseignantId, $annee): Comptes rendus
+    - getMemoires($enseignantId, $annee): Memoires
+    - getStatistiques($enseignantId): Statistiques enseignant
+
+--------------------------------------------------------------------------------
+A.20 SERVICES UTILITAIRES
+--------------------------------------------------------------------------------
+
+DossierAcademiqueService (71 lignes)
+  Fichier: app/Services/DossierAcademiqueService.php
+  Dependances: DossierAcademique
+  Tables: dossier_academique
+  Methodes:
+    - saveOrUpdate($data): Sauvegarde/mise a jour
+    - getByNumEtu($numEtu): Dossier par etudiant
+
+
+================================================================================
+PARTIE B: MODELS
+================================================================================
+
+Classe                Fichier                            Table(s)                 Lignes  Methodes cles
+--------------------- ---------------------------------- ------------------------ ------- -----------------------------
+Action                app/models/Action.php              actions                  ~50     getAll(), getById()
+AnneeAcademique       app/models/AnneeAcademique.php     annee_academique         ~120    getAll(), getActive(), create()
+Approuver             app/models/Approuver.php           approuver                ~100    create(), getByRapport()
+Archive               app/models/Archive.php             archives                 ~80     getAll(), create()
+Attribution           app/models/Attribution.php         attributions             ~70     getAll(), create()
+CandidatureSoutenance app/models/CandidatureSoutenance.c candidature_soutenance   ~150    create(), getByEtudiant(), update()
+Categorie             app/models/Categorie.php           categories               ~60     getAll(), getById()
+CompteRendu           app/models/CompteRendu.php         compte_rendu             ~90     create(), getById(), update()
+Cours                 app/models/Cours.php               cours                    ~50     getAll()
+CritereEvaluation     app/models/CritereEvaluation.php   critere_evaluation       ~130    getAll(), create(), update(), getBaremes()
+DossierAcademique     app/models/DossierAcademique.php   dossier_academique       ~80     saveOrUpdate(), getByNumEtu()
+Echeance              app/models/Echeance.php            echeances                ~70     create(), getByInscription()
+Enseignant            app/models/Enseignant.php          enseignants              ~200    getAll(), getById(), create(), update()
+Entreprise            app/models/Entreprise.php          entreprises              ~80     getAll(), create(), getById()
+Etudiant              app/models/Etudiant.php            etudiants                ~350    getAll(), getById(), create(), update(),
+                                                                                          getEtudiantById(), getCandidature(),
+                                                                                          getCandidatures(), getCompteRendu()
+Evaluation            app/models/Evaluation.php          evaluations              ~60     create(), getBySoutenance()
+EvaluationRapport     app/models/EvaluationRapport.php   evaluations_rapports     ~120    create(), getByRapport(), getVotes()
+Fonction              app/models/Fonction.php            fonctions                ~50     getAll()
+Fonctionnalite        app/models/Fonctionnalite.php      fonctionnalites          ~80     getAll(), getByCategorie()
+Grade                 app/models/Grade.php               grades                   ~50     getAll()
+GroupeUtilisateur     app/models/GroupeUtilisateur.php   groupes_utilisateurs     ~70     getAll(), getById()
+InfoStage             app/models/InfoStage.php           informations_stage       ~120    create(), getStageInfo(), update()
+Inscription           app/models/Inscription.php         inscriptions             ~180    create(), update(), getByEtudiant()
+Jury                  app/models/Jury.php                enseignant_jury          ~90     getBySoutenance(), create()
+MaitreDeStage         app/models/MaitreDeStage.php       maitres_de_stage         ~60     getAll(), create()
+Message               app/models/Message.php             messages                 ~50     getAll()
+NiveauAccesDonnees    app/models/NiveauAccesDonnees.php  niveau_acces_donnees     ~50     getAll()
+NiveauApprobation     app/models/NiveauApprobation.php   niveau_approbation       ~50     getAll()
+NiveauEtude           app/models/NiveauEtude.php         niveaux_etude            ~60     getAll()
+Note                  app/models/Note.php                notes                    ~120    create(), update(), getByEtudiant()
+Permission            app/models/Permission.php          permissions              ~70     getByUser()
+PersAdmin             app/models/PersAdmin.php           personnel_admin          ~120    getAll(), getById(), create()
+QualiteJury           app/models/QualiteJury.php         qualite_jury             ~50     getAll()
+Rapport               app/models/Rapport.php             rapport_etudiants        ~80     getAll()
+RapportEtudiant       app/models/RapportEtudiant.php     rapport_etudiants        ~280    create(), update(), getAll(), getById(),
+                                                                                          getByEtudiant(), getDeposes()
+Reclamation           app/models/Reclamation.php         reclamations             ~130    create(), update(), getAll()
+Salle                 app/models/Salle.php               salles                   ~80     getAll(), create(), update()
+Scolarite             app/models/Scolarite.php           scolarite                ~100    getAll(), getById()
+Semestre              app/models/Semestre.php            semestres                ~50     getAll()
+Soutenance            app/models/Soutenance.php          programmer_soutenance    ~90     getById(), getAll()
+Specialite            app/models/Specialite.php          specialites              ~50     getAll()
+StatutJury            app/models/StatutJury.php          statuts_jury             ~50     getAll()
+Traitement            app/models/Traitement.php          traitements              ~80     getAll()
+TypeUtilisateur       app/models/TypeUtilisateur.php     type_utilisateur         ~60     getAll()
+Utilisateur           app/models/Utilisateur.php         utilisateur              ~250    getAll(), getById(), getByLogin(),
+                                                                                          create(), update(), checkLogin()
+Valider               app/models/Valider.php             valider                  ~90     create(), getByRapport()
+Versement             app/models/Versement.php           versements               ~100    create(), getAll(), getByInscription()
+
+
+================================================================================
+RESUME STATISTIQUE
+================================================================================
+
+┌──────────────────────────────────────────────────────────────────┐
+│                          SERVICES                                │
+├──────────────────────────────────────────────────────────────────┤
+│ Nombre total de services:          ~46                           │
+│ Plus volumineux:                   ParametreService (2064 lignes)│
+│ Plus complexe:                     EvaluationSoutenanceService   │
+│ Services de generation PDF:        6                             │
+│ Services de dashboard:             5                             │
+│ Services de soutenance:            8                             │
+├──────────────────────────────────────────────────────────────────┤
+│                          MODELS                                  │
+├──────────────────────────────────────────────────────────────────┤
+│ Nombre total de models:            ~49                           │
+│ Plus volumineux:                   Etudiant (~350 lignes)        │
+│ Tables principales:                40+                           │
+│ Tables pivot:                      5+                            │
+└──────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

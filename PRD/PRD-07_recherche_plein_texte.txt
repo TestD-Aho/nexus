@@ -1,0 +1,150 @@
+# PRD-07 - Recherche plein texte etudiants avec laravel/scout
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Dependances amont: PRD-02, PRD-03, PRD-04, PRD-05
+- Composants imposes: `laravel/scout`, `symfony/string`
+
+## Resume executif
+Ce PRD introduit une recherche plein texte performante et securisee sur les listes etudiantes (et extensions futures), avec indexation progressive et controle strict des filtres metier.
+
+## Objectifs
+1. Offrir une recherche rapide sur etudiants et dossiers associes.
+2. Supporter recherche multi-champs et typo tolerance minimale.
+3. Maintenir securite d'acces (annee, role, permissions).
+4. Assurer coherences des resultats avec les donnees courantes.
+
+## Contraintes non negociables
+1. Aucun changement schema BDD.
+2. Les permissions existantes doivent filtrer les resultats.
+3. Pas d'exposition de donnees sensibles hors scope utilisateur.
+4. Mecanisme de reindexation sans interruption majeure.
+
+## Portee fonctionnelle phase 1
+- Recherche etudiants:
+  - `num_carte_etud`
+  - `nom_etu`
+  - `prenom_etu`
+  - `email_etu`
+  - `promotion_etu`
+- Filtres:
+  - annee academique (`inscriptions.id_annee_acad`)
+  - niveau (`inscriptions.id_niv_etude`)
+  - statut parcours (selon contexte metier)
+
+## Composants a implementer
+- `app\Search\SearchIndexManager.php`
+- `app\Search\StudentSearchDocumentFactory.php`
+- `app\Search\StudentSearchService.php`
+- `app\Search\SearchQueryPolicy.php`
+- `app\Search\SearchAuditLogger.php`
+
+## Integration Scout
+- Utiliser `laravel/scout` comme couche d'abstraction recherche.
+- Connecteur choisi sans modifier la BDD (driver externe ou database engine scout).
+- Indexation basee sur repositories:
+  - index initial batch
+  - index incremental sur creation/modification/suppression metier
+
+## Exigences fonctionnelles (FR)
+- FR-07-01: recherche en < 500ms cible sur dataset courant.
+- FR-07-02: pagination et tri stables.
+- FR-07-03: correction simple des variantes de texte (normalisation).
+- FR-07-04: affichage d'un score de pertinence optionnel.
+- FR-07-05: historique de recherche critique (audit technique).
+
+## Exigences techniques (NFR)
+- NFR-07-01: indexation asynchrone pilotable.
+- NFR-07-02: mode fallback repository si moteur indisponible.
+- NFR-07-03: normalisation `symfony/string` avant index/requete.
+- NFR-07-04: cache court des requetes populaires (PRD-05).
+
+## Tables concernees (lecture)
+- `etudiants`, `inscriptions`, `niveau_etude`, `annee_academique`
+- Option extension: `rapport_etudiants`, `candidature_soutenance`
+- Audit recherche: `pister` (events techniques)
+
+## Securite et filtrage
+- Scope obligatoire par role:
+  - admin: scope complet
+  - scolarite: scope annee active + permissions
+  - enseignant/commission: scope metier dedie
+- Validation des filtres avant execution.
+- Nettoyage requete utilisateur (string normalizer).
+
+## Plan d'implementation
+1. Mettre en place SearchIndexManager + mapping document etudiant.
+2. Construire API de recherche backend.
+3. Ajouter indexation initiale et incremental hooks.
+4. Integrer filtres permissions/annee.
+5. Stabiliser performance et observabilite.
+
+## Strategie de test
+- Unit tests de normalisation recherche.
+- Integration tests: exact match, partial match, typo simple.
+- Tests de scope securite par role.
+- Tests de fallback en cas d'indisponibilite moteur.
+
+## Criteres d'acceptation
+- Recherche etudiants operationnelle avec filtres metier.
+- Resultats conformes aux permissions.
+- Reindexation incremental fonctionnelle.
+- Aucun changement schema BDD.
+
+## Risques et mitigations
+- Risque: desynchronisation index/donnees.  
+  Mitigation: jobs de reconciliation periodiques.
+- Risque: cout indexation initiale.  
+  Mitigation: batch par fenetres et monitoring.
+- Risque: bruit des resultats.  
+  Mitigation: tuning normalisation + poids des champs.
+
+## Definition of done
+- Service de recherche deploye et documente.
+- Indexation initiale + update incremental valides.
+- KPI latence et precision suivis.
+
+## Annexe detaillee G - specification index, scoring et securisation recherche
+
+### Contrat document indexe (etudiant)
+```json
+{
+  "id": "num_carte_etud",
+  "num_carte_etud": "...",
+  "nom_etu": "...",
+  "prenom_etu": "...",
+  "email_etu": "...",
+  "promotion_etu": "...",
+  "id_annee_acad": 0,
+  "id_niv_etude": 0,
+  "search_blob": "nom prenom email matricule"
+}
+```
+
+### Politique de scoring
+- Poids fort: `num_carte_etud` exact match.
+- Poids moyen: `nom_etu`, `prenom_etu`.
+- Poids faible: `email_etu`, `promotion_etu`.
+- Bonus exactitude prefixe sur nom/prenom.
+
+### Matrice de filtrage securite
+| Profil | Scope recherche |
+|---|---|
+| Administrateur | global |
+| Scolarite | annee active + permissions |
+| Enseignant | scope pedagogique autorise |
+| Commission | scope dossiers autorises |
+
+### Reindexation et coherence
+1. Reindexation initiale batch.
+2. Reindexation incrementale sur ecritures repository.
+3. Tache de reconciliation periodique index vs DB.
+4. Alertes sur ecarts detectes.
+
+### Checklist recherche
+- [ ] Resultats filtres par permissions.
+- [ ] Index incremental actif.
+- [ ] Fallback repository disponible.
+- [ ] Logs de recherche exploitable.
+- [ ] Aucun changement schema BDD.

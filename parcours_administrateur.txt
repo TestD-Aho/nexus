@@ -1,0 +1,1001 @@
+================================================================================
+  PARCOURS UTILISATEUR - ADMINISTRATEUR (GROUPE 5)
+  Documentation technique complète du flux utilisateur administrateur
+  Application CheckMaster - UFR MI / MIAGE - UFHB-CI
+================================================================================
+
+TABLE DES MATIÈRES
+==================
+1.  Connexion et authentification
+2.  Dashboard Admin (page=dashboard)
+3.  Paramétrage (page=parametres_generaux) - 19+ sous-méthodes
+4.  Gestion Utilisateurs (page=gestion_utilisateurs)
+5.  Piste Audit (page=piste_audit)
+6.  Sauvegarde/Restauration (page=sauvegarde_restauration)
+7.  Référentiel RH (page=maj_enseignant, page=maj_personnel_admin)
+8.  Historique et Archivage (page=admin_historique)
+9.  Pages d'archives spécialisées
+10. Tables de la base de données
+11. Données de session et permissions
+12. Flux de données et interactions
+
+================================================================================
+1. CONNEXION ET AUTHENTIFICATION
+================================================================================
+
+Controller : AuthController
+Service    : CheckMaster\Services\AuthService
+
+Pour un administrateur (id_GU = 5) :
+
+  1. AuthService::login($login, $password, $ip) :
+     → Rate limiter : 5 tentatives, 15 min verrouillage, 10 min reset
+     → Utilisateur::verifierConnexion() vérifie login + mot de passe hashé
+     → Regénération de l'ID de session (sécurité)
+  
+  2. Variables de session :
+     ┌─────────────────────────┬──────────────────────────────────────┐
+     │ Variable de session     │ Description                          │
+     ├─────────────────────────┼──────────────────────────────────────┤
+     │ id_utilisateur          │ ID de l'utilisateur                  │
+     │ nom_utilisateur         │ Nom d'affichage                      │
+     │ statut_utilisateur      │ 'Actif' / 'Inactif'                  │
+     │ login_utilisateur       │ Login utilisé                        │
+     │ type_utilisateur        │ 'Personnel administratif' ou autre   │
+     │ id_GU                   │ 5 (Administrateur)                   │
+     │ lib_GU                  │ 'Administrateur'                     │
+     │ niveau_acces            │ Niveau d'accès maximal               │
+     └─────────────────────────┴──────────────────────────────────────┘
+  
+  3. Audit : AuditLog::logConnexion(id_utilisateur, 'utilisateur', 'Succès')
+
+================================================================================
+2. DASHBOARD ADMIN (page=dashboard)
+================================================================================
+
+Controller : DashboardController
+Service    : CheckMaster\Services\DashboardService
+Méthodes   : index(), populateDashboardGlobals(), getDashboardData()
+
+Description :
+  Tableau de bord global de l'administrateur avec vue d'ensemble de
+  l'ensemble du système.
+
+Flux d'exécution :
+
+  DashboardController::index()
+    │
+    ├─ DashboardService::logAccess($_SESSION['id_utilisateur'])
+    │   → Log d'accès au tableau de bord dans la piste d'audit
+    │
+    └─ DashboardService::populateDashboardGlobals()
+         │
+         ├─ Statistiques globales des utilisateurs :
+         │   → Nombre total d'utilisateurs
+         │   → Utilisateurs actifs
+         │   → Utilisateurs inactifs
+         │
+         ├─ Statistiques des étudiants :
+         │   → Nombre total d'étudiants
+         │   → Taux d'activité (étudiants inscrits cette année)
+         │
+         ├─ Statistiques des enseignants :
+         │   → Nombre total d'enseignants
+         │   → Répartition par grade
+         │   → Taux d'activité
+         │
+         ├─ Statistiques du personnel administratif :
+         │   → Nombre total de personnel admin
+         │   → Taux d'activité
+         │
+         ├─ Activités récentes :
+         │   → Dernières connexions
+         │   → Dernières modifications
+         │   → Dernières créations/suppressions
+         │
+         └─ Données d'évolution (6 mois) :
+             → Évolution des inscriptions
+             → Évolution des connexions
+             → Évolution des rapports
+
+Injection dans $GLOBALS :
+  → Toutes les statistiques sont injectées pour la vue
+
+Tables utilisées :
+  - utilisateurs          : comptes utilisateurs
+  - etudiants             : étudiants
+  - enseignants           : enseignants
+  - personnel_admin       : personnel administratif
+  - inscriptions          : inscriptions académiques
+  - audit_log             : activités récentes et évolution
+  - groupe_utilisateur    : groupes d'utilisateurs
+  - type_utilisateur      : types d'utilisateurs
+
+================================================================================
+3. PARAMÉTRAGE (page=parametres_generaux)
+================================================================================
+
+Controller : ParametreController
+Service    : CheckMaster\Services\ParametreService
+
+Description :
+  Module central de configuration avec 19+ sous-méthodes pour gérer
+  tous les paramètres de référence du système.
+
+Vérification de permission commune :
+  if (!canCreate('parametres_generaux') && !canEdit('parametres_generaux') 
+      && !canDelete('parametres_generaux'))
+    → 403 JSON (AJAX) ou redirection access_denied
+
+Chaque méthode suit le même pattern :
+  → Appel au service : $this->service->gestionXxx($_POST, $_GET, $id_utilisateur)
+  → Injection des résultats dans $GLOBALS
+  → Audit des modifications
+
+3.1 Gestion Années Académiques (gestionAnnees)
+
+  Table : annee_academique
+  
+  Opérations CRUD :
+  ┌──────────┬────────────────────────────────────────────────────────┐
+  │ Action   │ Description                                          │
+  ├──────────┼────────────────────────────────────────────────────────┤
+  │ Liste    │ SELECT * FROM annee_academique ORDER BY date_deb DESC │
+  │ Ajout    │ INSERT avec date_deb, date_fin, libellé              │
+  │ Modifier │ UPDATE des dates et libellé                          │
+  │ Suppr.   │ DELETE (si pas d'inscriptions associées)             │
+  │ Ouvrir   │ UPDATE statut = 'ouvert'                             │
+  │ Fermer   │ UPDATE statut = 'fermé'                              │
+  └──────────┴────────────────────────────────────────────────────────┘
+
+  Validation :
+  → Vérification que date_deb < date_fin
+  → Vérification de non-chevauchement avec d'autres années
+  → Impossible de supprimer une année avec des inscriptions
+
+3.2 Gestion Grades (gestionGrade)
+
+  Table : grade
+  
+  Opérations CRUD sur les grades académiques :
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ Grades typiques :                                                  │
+  │ AS  = Assistant                                                    │
+  │ MA  = Maître Assistant                                             │
+  │ MC  = Maître de Conférences                                        │
+  │ PT  = Professeur Titulaire                                         │
+  └────────────────────────────────────────────────────────────────────┘
+
+3.3 Gestion Fonctions Utilisateur (gestionFonctionUtilisateur)
+
+  Tables : groupe_utilisateur, type_utilisateur
+  
+  Interface à onglets :
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ Onglet 1 : groupes_utilisateur (CRUD)                              │
+  │ → Groupes : Administrateur (5), Scolarité (8), Commission (11),   │
+  │            Enseignant (12), Secrétaire, etc.                       │
+  │                                                                    │
+  │ Onglet 2 : type_utilisateur (CRUD)                                 │
+  │ → Types : Etudiant, Enseignant simple, Enseignant administratif,  │
+  │           Personnel administratif                                  │
+  └────────────────────────────────────────────────────────────────────┘
+
+3.4 Gestion Spécialités (gestionSpecialite)
+
+  Table : specialite
+  → CRUD des spécialités d'enseignement
+
+3.5 Gestion Niveaux d'Étude (gestionNiveauEtude)
+
+  Table : niveau_etude, frais_inscription
+  
+  → CRUD des niveaux d'étude (Licence 1, Licence 2, Master 1, etc.)
+  → Gestion des montants de frais d'inscription par niveau
+  → Association avec l'enseignant responsable (id_enseignant)
+
+3.6 Gestion Statuts Jury (gestionStatutJury)
+
+  Table : qualite_jury / statut_jury
+  
+  → CRUD des rôles dans le jury :
+    - Président du Jury (PJ)
+    - Examinateur (EX)
+    - Directeur de Mémoire (DM)
+    - Encadrant (EN)
+    - Maître de Stage (MS)
+
+3.7 Gestion Niveaux d'Approbation (gestionNiveauApprobation)
+
+  Table : niveau_approbation
+  
+  → CRUD des niveaux d'approbation des rapports
+
+3.8 Gestion Semestres (gestionSemestre)
+
+  Table : semestre
+  
+  → CRUD des semestres liés aux niveaux d'étude
+  → Association avec niveau_etude
+
+3.9 Gestion Niveaux d'Accès Données (gestionNiveauAccesDonnees)
+
+  Table : niveau_acces_donnees
+  
+  → CRUD des niveaux d'accès aux données
+  → Utilisé pour contrôler la visibilité des données
+
+3.10 Gestion Traitements (gestionTraitement)
+
+  Table : traitement
+  
+  → CRUD des traitements (éléments de menu)
+  → Chaque traitement correspond à une fonctionnalité/page
+  → Utilisé pour le système de permissions
+
+3.11 Gestion Entreprises (gestionEntreprise)
+
+  Table : entreprises
+  
+  → CRUD des entreprises partenaires (stages)
+
+3.12 Gestion Actions (gestionAction)
+
+  Table : action
+  
+  → CRUD des actions d'audit (connexions, modifications, suppressions)
+
+3.13 Gestion Fonctions (gestionFonction)
+
+  Table : fonction
+  
+  → CRUD des fonctions occupées par le personnel
+
+3.14 Gestion Messagerie (gestionMessagerie)
+
+  Table : messages
+  
+  → CRUD des modèles de messages/emails
+
+3.15 Gestion Attributions (gestionAttribution)
+
+  Table : attribution
+  
+  → CRUD des permissions par groupe d'utilisateurs
+  → Association groupe_utilisateur → traitement → droits (CRUD)
+  → Table pivot essentielle pour le RBAC
+
+  Schéma :
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ id_attribution, id_GU, id_traitement,                             │
+  │ can_view, can_create, can_edit, can_delete                        │
+  └────────────────────────────────────────────────────────────────────┘
+
+3.16 Gestion Menus (gestionMenus)
+
+  Tables : categories_fonctionnalites, fonctionnalites
+  
+  → CRUD des catégories de menu et des fonctionnalités
+  → Organisation hiérarchique des menus
+
+3.17 Gestion Barème Critères (gestionBaremeCritere)
+
+  Table : bareme_critere
+  
+  → CRUD des critères d'évaluation par année académique
+
+3.18 Gestion Salles (gestionSalles)
+
+  → Délégation vers GestionSallesController
+  → CRUD des salles de soutenance
+
+================================================================================
+4. GESTION UTILISATEURS (page=gestion_utilisateurs)
+================================================================================
+
+Controller : GestionUtilisateurController
+Service    : CheckMaster\Services\GestionUtilisateurService
+
+4.1 Affichage principal (index)
+
+Vérification :
+  if (!canView('gestion_utilisateurs')) → access_denied
+
+  GestionUtilisateurController::index()
+    │
+    ├─ Récupération des personnes non enregistrées :
+    │   → getNonUtilisateurs() :
+    │     - enseignantsNonUtilisateurs : enseignants sans compte
+    │     - personnelNonUtilisateurs   : personnel admin sans compte
+    │     - etudiantsNonUtilisateurs   : étudiants sans compte
+    │
+    ├─ Récupération des listes de référence :
+    │   → getReferenceLists() :
+    │     - types_utilisateurs, groupes_utilisateur,
+    │       niveaux_acces, annees_academiques
+    │
+    └─ Injection dans $GLOBALS :
+        enseignantsNonUtilisateurs, personnelNonUtilisateurs,
+        etudiantsNonUtilisateurs, liste de référence
+
+4.2 Ajout d'un utilisateur (btn_add_utilisateur)
+
+Vérification :
+  if (!canCreate('gestion_utilisateurs')) → 403 / access_denied
+
+Flux :
+  GestionUtilisateurService::addUtilisateur($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation des données
+    │   → nom_utilisateur, login_utilisateur, id_type_utilisateur,
+    │     id_GU, id_niv_acces_donnee, statut_utilisateur
+    │
+    ├─ 2. Vérification de l'unicité du login
+    │   → Login non existant dans la table utilisateurs
+    │
+    ├─ 3. Génération du mot de passe
+    │   → Génération automatique (mot de passe aléatoire)
+    │   → Hashage avec password_hash()
+    │
+    ├─ 4. INSERT INTO utilisateurs
+    │   → Tous les champs + mot de passe hashé
+    │
+    ├─ 5. Envoi email de bienvenue
+    │   → EmailService avec les identifiants
+    │   → Contient : login, mot de passe temporaire, lien de connexion
+    │
+    └─ 6. Audit : log de la création
+
+Réponse :
+  { success: true, message: '...', feedback_type: 'success' }
+
+4.3 Ajout en masse (btn_add_multiple)
+
+Vérification :
+  if (!canCreate('gestion_utilisateurs')) → 403
+
+Flux :
+  GestionUtilisateurService::addUtilisateursEnMasse($selected_persons, $commonData, $id_utilisateur)
+    │
+    ├─ $commonData = [
+    │     id_type_utilisateur, id_GU, id_niveau_acces, statut_utilisateur
+    │   ]
+    │
+    ├─ Pour chaque personne sélectionnée :
+    │   → Création d'un compte utilisateur
+    │   → Génération mot de passe
+    │   → Envoi email de bienvenue
+    │
+    └─ Rapport : nombre de créations réussies/échouées
+
+4.4 Modification d'un utilisateur (btn_modifier_utilisateur)
+
+Vérification :
+  if (!canEdit('gestion_utilisateurs')) → 403
+
+Flux :
+  GestionUtilisateurService::updateUtilisateur($_POST, $id_utilisateur)
+    │
+    ├─ 1. Validation des données
+    │
+    ├─ 2. UPDATE utilisateurs
+    │   → Mise à jour des champs modifiés
+    │
+    └─ 3. Audit : log de la modification
+
+4.5 Activation/Désactivation multiple
+
+Vérification :
+  if (!canEdit('gestion_utilisateurs')) → 403
+
+Activation (submit_enable_multiple = 3) :
+  → enableMultipleUtilisateurs($selected_ids, $id_utilisateur)
+  → UPDATE utilisateurs SET statut_utilisateur = 'Actif'
+    WHERE id_utilisateur IN (...)
+
+Désactivation (submit_disable_multiple = 2) :
+  → disableMultipleUtilisateurs($selected_ids, $id_utilisateur)
+  → UPDATE utilisateurs SET statut_utilisateur = 'Inactif'
+    WHERE id_utilisateur IN (...)
+
+4.6 Envoi des identifiants (submit_send_access)
+
+Vérification :
+  if (!canEdit('gestion_utilisateurs')) → 403
+
+Flux :
+  → sendAccessToMultipleUtilisateurs($selected_ids, $id_utilisateur)
+  → Pour chaque utilisateur sélectionné :
+    - Génération d'un lien de réinitialisation
+    - Envoi email avec les identifiants d'accès
+
+4.7 Vérification disponibilité login (AJAX checkLogin)
+
+  GestionUtilisateurController::checkLoginAvailability()
+    → Vérifie canView('gestion_utilisateurs')
+    → GET login
+    → Service::checkLoginAvailability($login)
+    → Retourne JSON : { success: true/false, message: '...', login: '...' }
+    → Propose une alternative si le login est déjà pris
+
+Tables utilisées :
+  - utilisateurs           : comptes utilisateurs
+  - enseignants            : enseignants sans compte
+  - personnel_admin        : personnel admin sans compte
+  - etudiants              : étudiants sans compte
+  - type_utilisateur       : types d'utilisateurs
+  - groupe_utilisateur     : groupes d'utilisateurs
+  - niveau_acces_donnees   : niveaux d'accès
+  - audit_log              : piste d'audit
+
+================================================================================
+5. PISTE AUDIT (page=piste_audit)
+================================================================================
+
+Controller : AuditController
+Service    : CheckMaster\Services\AuditService
+
+5.1 Affichage (index)
+
+  AuditController::index()
+    │
+    ├─ getAllActions() → liste des actions pour le filtre
+    │
+    ├─ Paramètres de pagination :
+    │   → page_num (défaut: 1), limit (5, 10, 25, 50, 100; défaut: 10)
+    │
+    ├─ Extraction des filtres (extractFilters) :
+    │   → Utilisateur, action, date début/fin, table, statut
+    │
+    ├─ getFilteredAuditLog($filters, $offset, $perPage)
+    │   → Requête SQL dynamique avec WHERE construit depuis filtres
+    │   → Tri par date_action DESC
+    │
+    ├─ getTotalFilteredLogs($filters)
+    │   → Comptage total pour la pagination
+    │
+    └─ handleSpecialActions() :
+        → export, cleanup, delete_log
+
+5.2 Export CSV (action=export)
+
+Vérification :
+  if (!canView('piste_audit')) → 403 JSON
+
+Flux :
+  AuditController::exportAuditLog()
+    │
+    ├─ Extraction des filtres actuels
+    │
+    ├─ Headers HTTP :
+    │   → Content-Type: text/csv; charset=utf-8
+    │   → Content-Disposition: attachment; filename="audit_log_YYYY-MM-DD_HH-MM-SS.csv"
+    │
+    └─ AuditService::exportToStream($output, $filters)
+        → Écriture directe dans php://output
+        → Colonnes : date, utilisateur, action, table, statut, détails
+
+5.3 Nettoyage (action=cleanup)
+
+Vérifications :
+  → Méthode POST uniquement
+  → CSRF : cm_csrf_verify($_POST['csrf_token'])
+  → Permission : if (!canDelete('piste_audit'))
+
+Flux POST :
+  AuditController::cleanupAuditLog()
+    │
+    ├─ Récupération du nombre de jours (défaut: 30)
+    │
+    └─ AuditService::cleanupLogs($days, $id_utilisateur)
+        → DELETE FROM audit_log WHERE date_action < NOW() - INTERVAL ? DAY
+        → Retourne { success, deleted: nombre_supprimés }
+
+5.4 Suppression d'un log (action=delete_log)
+
+Vérifications :
+  → Méthode POST, CSRF, canDelete('piste_audit')
+
+Flux POST :
+  → deleteSingleLog($logId, $id_utilisateur)
+  → DELETE FROM audit_log WHERE id_log = ?
+
+5.5 Listes pour filtres
+
+  getTablesList()   → Liste des tables surveillées
+  getStatutsList()  → Liste des statuts (Succès, Erreur)
+
+Tables utilisées :
+  - audit_log             : logs d'audit
+  - utilisateurs          : pour les filtres par utilisateur
+  - action                : pour les filtres par action
+
+================================================================================
+6. SAUVEGARDE/RESTAURATION (page=sauvegarde_restauration)
+================================================================================
+
+Controller : SauvegardeRestaurationController
+Service    : CheckMaster\Services\SauvegardeRestaurationService
+
+Sécurité renforcée :
+  → requireAdmin() : vérifie lib_GU = 'administrateur' ou 'admin'
+  → requireCsrf() : vérifie le token CSRF via Csrf::validate()
+  → Permission canCreate/canEdit/canDelete sur 'sauvegarde_restauration'
+
+6.1 Affichage (index)
+
+  → getBackups() : liste les fichiers de sauvegarde avec métadonnées
+    - Nom du fichier
+    - Date de création
+    - Taille
+    - Auteur
+
+6.2 Création d'une sauvegarde (createBackup)
+
+Vérifications :
+  → requireAdmin(), requireCsrf(), canCreate('sauvegarde_restauration')
+
+Flux POST :
+  SauvegardeRestaurationService::createBackup($backupName, $id_utilisateur)
+    │
+    ├─ 1. Génération du nom de fichier
+    │   → backup_YYYYMMDD_HHMMSS.sql (ou nom personnalisé)
+    │
+    ├─ 2. Méthode PHP (primaire) :
+    │   → Lecture de toutes les tables de la BD
+    │   → Pour chaque table :
+    │     - SHOW CREATE TABLE → structure
+    │     - SELECT * → données
+    │     - Génération des INSERT INTO
+    │   → Écriture dans storage/backups/
+    │
+    ├─ 3. Méthode Docker mysqldump (fallback) :
+    │   → Si la méthode PHP échoue
+    │   → exécution : docker exec mysql_container mysqldump ...
+    │
+    ├─ 4. Enregistrement des métadonnées
+    │   → Date, auteur, taille, tables incluses
+    │
+    └─ 5. Audit : log de la sauvegarde
+    
+  Retour : { redirect: '?page=sauvegarde_restauration&success=1' }
+
+6.3 Restauration d'une sauvegarde (restoreBackup)
+
+Vérifications :
+  → requireAdmin(), requireCsrf(), canEdit('sauvegarde_restauration')
+
+Flux POST :
+  SauvegardeRestaurationService::restoreBackup($filename, $id_utilisateur)
+    │
+    ├─ 1. Validation du nom de fichier
+    │   → Vérifie que le fichier existe dans le dossier de backups
+    │   → Vérifie le format (.sql)
+    │
+    ├─ 2. DROP de toutes les tables existantes
+    │   → Désactivation des vérifications FK
+    │   → DROP TABLE pour chaque table
+    │
+    ├─ 3. Lecture et parsing du fichier SQL
+    │   → Lecture ligne par ligne
+    │   → Séparation des requêtes (splitSQL)
+    │
+    ├─ 4. Exécution des requêtes
+    │   → CREATE TABLE d'abord
+    │   → INSERT INTO ensuite
+    │   → Gestion des erreurs par requête
+    │
+    ├─ 5. Réactivation des vérifications FK
+    │
+    └─ 6. Audit : log de la restauration
+
+6.4 Suppression d'une sauvegarde (deleteBackup)
+
+Vérifications :
+  → requireAdmin(), requireCsrf(), canDelete('sauvegarde_restauration')
+
+Flux POST :
+  → Suppression du fichier de backup
+  → Audit log
+
+6.5 Téléchargement d'une sauvegarde (downloadBackup)
+
+Vérifications :
+  → Session utilisateur requise
+
+Flux GET :
+  → Lecture du fichier
+  → Headers de téléchargement
+  → readfile() direct
+
+Tables utilisées :
+  - Toutes les tables de la base de données (sauvegarde/restauration)
+  - audit_log              : piste d'audit des opérations
+
+================================================================================
+7. RÉFÉRENTIEL RH (page=maj_enseignant, page=maj_personnel_admin)
+================================================================================
+
+Controller : GestionRhController
+Service    : CheckMaster\Services\GestionRhService
+
+Description :
+  Gestion des référentiels des ressources humaines avec deux onglets :
+  enseignants et personnel administratif.
+
+7.1 Onglet Enseignants (tab=enseignant)
+
+  CRUD des enseignants :
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ Champs gérés :                                                     │
+  │ - nom_enseignant, prenom_enseignant                                │
+  │ - mail_enseignant                                                  │
+  │ - Grade (via table avoir → grade)                                  │
+  │ - Spécialité (via table avoir → specialite)                        │
+  │ - Fonction (via table occuper → fonction)                          │
+  │ - Dates : date_grade, date_occupation                              │
+  └────────────────────────────────────────────────────────────────────┘
+
+  Relations :
+  enseignants → avoir (pivot) → grade (N:1)
+  enseignants → avoir (pivot) → specialite (N:1)
+  enseignants → occuper (pivot) → fonction (N:1)
+
+7.2 Onglet Personnel Administratif (tab=pers_admin)
+
+  CRUD du personnel administratif :
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ Champs gérés :                                                     │
+  │ - nom_pers_admin, prenom_pers_admin                                │
+  │ - tel_pers_admin, poste                                            │
+  │ - date_embauche                                                    │
+  │ - Fonction (via table occuper → fonction)                          │
+  │ - Genre (via table genre)                                          │
+  └────────────────────────────────────────────────────────────────────┘
+
+Tables utilisées :
+  - enseignants           : données enseignants
+  - personnel_admin       : données personnel admin
+  - grade                 : grades académiques
+  - specialite            : spécialités
+  - fonction              : fonctions
+  - avoir                 : pivot enseignant-grade/specialite
+  - occuper               : pivot enseignant/pers_admin-fonction
+  - genre                 : genre (M/F)
+
+================================================================================
+8. HISTORIQUE ET ARCHIVAGE (page=admin_historique)
+================================================================================
+
+Controller : ArchiveHubController
+Models     : Archive, AnneeAcademique
+
+Description :
+  Hub central d'historique et d'archivage avec 9 onglets pour consulter
+  toutes les données archivées de l'application.
+
+8.1 Vue d'ensemble (tab=vue_ensemble)
+
+  Données affichées :
+  → Taux de réussite global (rapports validés / total)
+  → Moyennes des soutenances
+  → Nombre de jours de soutenances programmées
+  → Rapports déposés vs total
+  → Timeline des événements clés
+
+8.2 Étudiants (tab=etudiants)
+
+  → Liste des étudiants avec filtres par année
+  → Informations complètes (inscription, notes, rapports)
+  → Historique académique
+
+8.3 Soutenances (tab=soutenances)
+
+  → Liste des soutenances passées
+  → Détails : date, salle, jury, notes, mentions
+
+8.4 Jurys (tab=jurys)
+
+  → Historique des compositions de jury
+  → Participation des enseignants aux jurys
+
+8.5 Documents (tab=documents)
+
+  → Historique des documents (rapports, CR, mémoires)
+  → Téléchargement des PDF archivés
+
+8.6 Candidatures (tab=candidatures)
+
+  → Historique des candidatures à la soutenance
+  → Statuts et décisions
+
+8.7 Réclamations (tab=reclamations)
+
+  → Historique des réclamations
+  → Résolutions et délais de traitement
+
+8.8 Statistiques (tab=statistiques)
+
+  → Statistiques globales
+  → Évolution annuelle
+  → Distribution des mentions
+  → Top entreprises partenaires
+
+8.9 Import (tab=import)
+
+  → Import d'archives CSV via ExcelImportService
+  → Mapping des colonnes
+  → Validation et import en masse
+
+Filtre par année académique :
+  → $_SESSION['archive_annee_acad']
+  → $_SESSION['archive_annee_libelle']
+  → Sélecteur d'année dans l'interface
+
+================================================================================
+9. PAGES D'ARCHIVES SPÉCIALISÉES
+================================================================================
+
+9.1 ArchiveDocumentController
+
+  → Affichage des PDF dans un viewer intégré
+  → Téléchargement des documents archivés
+  → Types : rapports, comptes rendus, mémoires
+
+9.2 ArchiveSoutenanceController
+
+  → Fiches de soutenance détaillées
+  → Composition du jury, notes, délibération
+  → Impression/export des fiches
+
+9.3 ArchiveEtudiantController
+
+  → Dossiers étudiants avec timeline
+  → Historique académique complet
+  → Tous les documents associés
+
+9.4 ArchiveAdminController
+
+  → Archives des candidatures
+  → Archives des réclamations
+  → Vue consolidée de l'historique administratif
+
+9.5 ArchivesDossiersSoutenanceController
+
+  → Dossiers de soutenance archivés
+  → Rapports + évaluations + décisions
+
+9.6 ArchivesCompteRenduController
+
+  → Comptes rendus archivés
+  → Visualisation et téléchargement
+
+================================================================================
+10. TABLES DE LA BASE DE DONNÉES
+================================================================================
+
+┌─────────────────────────┬─────────────────────────────────────────────────┐
+│ Table                   │ Rôle dans le parcours administrateur            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ utilisateurs            │ CRUD complet des comptes utilisateurs           │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ groupe_utilisateur      │ Groupes d'utilisateurs (RBAC)                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ type_utilisateur        │ Types d'utilisateurs                            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_acces_donnees    │ Niveaux d'accès aux données                     │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ traitement              │ Menu items / fonctionnalités                    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ attribution             │ Permissions RBAC (groupe → traitement → CRUD)   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ annee_academique        │ CRUD années académiques                         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ grade                   │ Grades académiques (AS, MA, MC, PT)             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ specialite              │ Spécialités d'enseignement                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_etude            │ Niveaux d'étude + frais inscription             │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ frais_inscription       │ Montants des frais par niveau                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ qualite_jury            │ Statuts/rôles de jury                           │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ niveau_approbation      │ Niveaux d'approbation                           │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ semestre                │ Semestres liés aux niveaux                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ fonction                │ Fonctions du personnel                          │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ entreprises             │ Entreprises partenaires                         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ action                  │ Actions d'audit                                 │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ messages                │ Modèles de messages/emails                      │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ bareme_critere          │ Barème d'évaluation par année                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ categories_fonctionnalites │ Catégories de menu                         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ fonctionnalites         │ Fonctionnalités du menu                         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ enseignants             │ Référentiel enseignants (RH)                    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ personnel_admin         │ Référentiel personnel admin (RH)                │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ avoir                   │ Pivot enseignant-grade/specialite               │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ occuper                 │ Pivot enseignant/pers_admin-fonction            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ genre                   │ Genre (M/F)                                     │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ salles                  │ Salles de soutenance                            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ audit_log               │ Piste d'audit complète                          │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ session                 │ Sessions (ordinaire, rattrapage)                │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ etudiants               │ Étudiants (pour archives)                       │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ inscriptions            │ Inscriptions (pour archives)                    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ rapport_etudiants       │ Rapports (pour archives)                        │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ compte_rendu            │ Comptes rendus (pour archives)                  │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ programmer_soutenance   │ Programmation (pour archives)                   │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ valider                 │ Décisions validation (pour archives)            │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ reclamations            │ Réclamations (pour archives)                    │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ evaluer                 │ Évaluations soutenances (pour archives)         │
+├─────────────────────────┼─────────────────────────────────────────────────┤
+│ enseignant_jury         │ Composition jurys (pour archives)               │
+└─────────────────────────┴─────────────────────────────────────────────────┘
+
+================================================================================
+11. DONNÉES DE SESSION ET PERMISSIONS
+================================================================================
+
+Variables de session pour l'administrateur :
+
+┌───────────────────────────┬──────────────────────────────────────────────┐
+│ Variable                  │ Description                                  │
+├───────────────────────────┼──────────────────────────────────────────────┤
+│ id_utilisateur            │ ID de l'utilisateur connecté                 │
+│ nom_utilisateur           │ Nom d'affichage                              │
+│ login_utilisateur         │ Login                                        │
+│ statut_utilisateur        │ 'Actif'                                      │
+│ id_GU                     │ 5 (Administrateur)                           │
+│ lib_GU                    │ 'Administrateur'                             │
+│ type_utilisateur          │ Type d'utilisateur                           │
+│ niveau_acces              │ Niveau d'accès maximal                       │
+│ telephone                 │ Téléphone (si personnel admin)               │
+│ poste                     │ Poste (si personnel admin)                   │
+│ date_embauche             │ Date d'embauche (si personnel admin)         │
+└───────────────────────────┴──────────────────────────────────────────────┘
+
+Permissions de l'administrateur :
+  L'administrateur a accès à toutes les fonctionnalités.
+  Les vérifications de permissions sont effectuées néanmoins pour
+  maintenir la traçabilité et permettre la délégranulation des droits.
+
+Tableau des permissions :
+
+┌──────────────────────────────────┬──────┬────────┬──────┬────────┐
+│ Page                             │ View │ Create │ Edit │ Delete │
+├──────────────────────────────────┼──────┼────────┼──────┼────────┤
+│ dashboard                        │ OUI  │ -      │ -    │ -      │
+│ parametres_generaux             │ OUI  │ OUI    │ OUI  │ OUI    │
+│ gestion_utilisateurs            │ OUI  │ OUI    │ OUI  │ -      │
+│ piste_audit                     │ OUI  │ -      │ -    │ OUI    │
+│ sauvegarde_restauration         │ OUI  │ OUI    │ OUI  │ OUI    │
+│ maj_enseignant                  │ OUI  │ OUI    │ OUI  │ OUI    │
+│ maj_personnel_admin             │ OUI  │ OUI    │ OUI  │ OUI    │
+│ admin_historique                │ OUI  │ OUI    │ -    │ -      │
+└──────────────────────────────────┴──────┴────────┴──────┴────────┘
+
+Vérifications CSRF :
+  → Sauvegarde/Restauration : requireCsrf() sur toutes les opérations POST
+  → Nettoyage audit : cm_csrf_verify($_POST['csrf_token'])
+  → Suppression log : cm_csrf_verify($_POST['csrf_token'])
+
+================================================================================
+12. FLUX DE DONNÉES ET INTERACTIONS
+================================================================================
+
+Flux principaux de l'administrateur :
+
+1. Connexion → Dashboard :
+   AuthService::login() → session id_GU=5 →
+   DashboardController::index() → logAccess() →
+   DashboardService::populateDashboardGlobals() →
+   Stats utilisateurs + étudiants + enseignants + personnel →
+   Vue dashboard
+
+2. Dashboard → Paramétrage :
+   Navigation → ParametreController::gestionXxx() →
+   Vérification permission parametres_generaux →
+   ParametreService (CRUD) → Audit log → $GLOBALS → Vue
+
+3. Paramétrage → Gestion Utilisateurs :
+   Navigation → GestionUtilisateurController::index() →
+   getNonUtilisateurs() + getReferenceLists() →
+   POST add/update/enable/disable/send_access →
+   GestionUtilisateurService → Audit log → Vue
+
+4. Gestion Utilisateurs → Piste Audit :
+   Navigation → AuditController::index() →
+   extractFilters() + getFilteredAuditLog() →
+   Actions spéciales : export CSV, cleanup, delete_log →
+   Vue piste_audit
+
+5. Piste Audit → Sauvegarde/Restauration :
+   Navigation → SauvegardeRestaurationController →
+   requireAdmin() + requireCsrf() + permission check →
+   createBackup() / restoreBackup() / deleteBackup() →
+   SauvegardeRestaurationService → Audit log → Vue
+
+6. Référentiel RH :
+   Navigation → GestionRhController →
+   Tab enseignant / pers_admin → CRUD → Audit → Vue
+
+7. Historique et Archivage :
+   Navigation → ArchiveHubController::index() →
+   Sélection année académique → Chargement onglet →
+   loadVueEnsemble/loadEtudiants/loadSoutenances/... →
+   Vue admin_historique
+
+8. Archives spécialisées :
+   Navigation vers pages dédiées →
+   ArchiveDocumentController (PDF viewer) →
+   ArchiveSoutenanceController (fiches) →
+   ArchiveEtudiantController (dossiers + timeline) →
+   ArchiveAdminController (candidatures + réclamations)
+
+Séquence de sauvegarde/restauration :
+
+  Admin clique "Créer sauvegarde"
+    ↓
+  requireAdmin() + requireCsrf() + canCreate()
+    ↓
+  createBackup($backupName, $id_utilisateur)
+    ↓
+  Lecture structure + données de toutes les tables
+    ↓
+  Écriture fichier SQL dans storage/backups/
+    ↓
+  Audit log
+    ↓
+  Redirection avec message succès
+
+  Admin clique "Restaurer"
+    ↓
+  Confirmation modale
+    ↓
+  requireAdmin() + requireCsrf() + canEdit()
+    ↓
+  restoreBackup($filename, $id_utilisateur)
+    ↓
+  DROP de toutes les tables
+    ↓
+  Lecture et parsing du fichier SQL
+    ↓
+  Exécution CREATE TABLE puis INSERT
+    ↓
+  Audit log
+    ↓
+  Redirection avec message succès/erreur
+
+Gestion des erreurs globale :
+  → Toutes les erreurs sont capturées et loguées dans error_log
+  → Messages utilisateur via $GLOBALS['messageErreur'] / $GLOBALS['messageSuccess']
+  → Redirection vers access_denied pour les erreurs de permission
+  → Réponses JSON 403 pour les appels AJAX non autorisés
+  → Vérification CSRF systématique pour les opérations destructives
+  → Vérification admin supplémentaire (requireAdmin) pour la sauvegarde
+
+================================================================================
+FIN DE DOCUMENTATION
+================================================================================

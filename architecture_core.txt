@@ -1,0 +1,348 @@
+================================================================================
+  DOCUMENTATION TECHNIQUE CHECKMASTER — ARCHITECTURE CORE
+  Plateforme de gestion des soutenances MIAGE — UFHB
+  Date : 14 mars 2026
+================================================================================
+
+
+1. ARCHITECTURE GLOBALE
+=======================
+
+CheckMaster utilise une architecture PHP MVC personnalisée (Custom MVC) sans
+framework externe tel que Laravel ou Symfony. L'application est construite sur
+un ensemble de composants internes définis dans le namespace CheckMaster\Core.
+
+Structure des dossiers principaux :
+------------------------------------
+app/
+├── Core/           # Composants fondation (Bootstrap, Autoload, Router, Request,
+│                   #   Response, Session, Csrf)
+├── config/         # Configuration (database.php, permission_registry.php)
+├── Security/       # Système de permissions et d'autorisation (RBAC)
+├── middlewares/    # Middlewares de vérification des permissions
+├── Support/        # Classes utilitaires (Database wrapper)
+├── Controllers/    # Contrôleurs métier (42 fichiers)
+├── Services/       # Services métier (35+ fichiers)
+├── models/         # Modèles de données (40+ fichiers)
+└── utils/          # Fonctions helpers et utilitaires
+
+Points d'entrée :
+- index.php          : Page d'accueil publique (landing page)
+- public/app/index.php : Point d'entrée principal de l'application
+
+
+2. BOOTSTRAP — app/Core/Bootstrap.php
+=====================================
+
+Namespace : CheckMaster\Core
+Classe    : Bootstrap (final)
+
+Méthode : Bootstrap::init(): void
+
+Configuration appliquée :
+- display_errors = '0'       → Empêche l'affichage des erreurs en production
+                              (évite les fuites de chemins, requêtes SQL, etc.)
+- display_startup_errors = '0'
+- error_reporting = E_ALL    → Toutes les erreurs sont rapportées mais non affichées
+- log_errors = '1'           → Les erreurs sont journalisées dans un fichier
+- error_log = [racine]/logs/php-error.log
+
+Le chemin du fichier de log est calculé dynamiquement :
+  dirname(__DIR__, 2) . '/logs/php-error.log'
+  (soit [racine]/logs/php-error.log)
+
+Le Bootstrap est appelé au démarrage de l'application pour s'assurer que
+les erreurs ne sont jamais exposées aux utilisateurs finaux.
+
+
+3. AUTOLOADER — app/Core/Autoload.php
+=====================================
+
+L'autoloader fonctionne en deux niveaux :
+
+Niveau 1 — Composer PSR-4 :
+  Charge vendor/autoload.php qui gère les namespaces App\, CheckMaster\
+  (si configuré dans composer.json) et les dépendances vendor.
+
+Niveau 2 — SPL Fallback pour CheckMaster\ :
+  Enregistre une fonction spl_autoload_register qui :
+  - Vérifie si la classe commence par le préfixe 'CheckMaster\'
+  - Extrait le chemin relatif après le préfixe
+  - Remplace les backslashs par le séparateur de répertoire
+  - Ajoute l'extension .php
+  - Charge le fichier depuis app/ (dirname(__DIR__))
+
+Exemple de résolution :
+  CheckMaster\Core\Router → app/Core/Router.php
+  CheckMaster\Security\AuthorizationService → app/Security/AuthorizationService.php
+
+Les contrôleurs, services et modèles (sans namespace) sont chargés via
+require_once explicite dans les fichiers qui les utilisent.
+
+
+4. ROUTER — app/Core/Router.php
+===============================
+
+Namespace : CheckMaster\Core
+Classe    : Router (final)
+
+Le router est un routeur basé sur une table de correspondance (map-based).
+Il ne supporte pas les expressions régulières ou les paramètres dynamiques.
+
+Méthodes :
+- get(string $path, callable $handler): void
+  Enregistre une route pour la méthode GET.
+
+- post(string $path, callable $handler): void
+  Enregistre une route pour la méthode POST.
+
+- map(string $method, string $path, callable $handler): void
+  Enregistre une route pour n'importe quelle méthode HTTP.
+  Normalise le path (trim des slashes, '/' par défaut).
+
+- dispatch(Request $req): Response
+  Parcourt toutes les routes enregistrées :
+  1. Compare la méthode HTTP
+  2. Compare le chemin exact (égalité stricte, pas de regex)
+  3. Si correspondance → exécute le handler
+  4. Si le handler retourne Response → la retourne
+  5. Sinon → crée une nouvelle Response avec le résultat
+  6. Si aucune correspondance → retourne Response 404
+
+La correspondance est exacte (===), il n'y a pas de résolution de patterns
+ou de paramètres de route. Cela fonctionne avec le système legacy de
+l'application qui utilise ?page=...&action=... pour la navigation.
+
+
+5. REQUEST — app/Core/Request.php
+=================================
+
+Namespace : CheckMaster\Core
+Classe    : Request (final)
+
+Propriétés publiques :
+- string $method   → Méthode HTTP (GET, POST, etc.)
+- string $path     → Chemin résolu de la requête
+- array  $query    → Paramètres GET ($_GET)
+- array  $post     → Paramètres POST ($_POST)
+- array  $server   → Variables serveur ($_SERVER)
+
+Factory : Request::fromGlobals(): self
+  Crée une instance à partir des superglobales $_SERVER, $_GET, $_POST.
+
+Résolution du chemin (resolvePath) — 3 stratégies :
+1. Mode ?_path= :
+   Si $_GET['_path'] existe et est non vide, l'utilise directement.
+   Exemple : /public/app/index.php?_path=/login → /login
+
+2. PATH_INFO :
+   Si $_SERVER['PATH_INFO'] est défini et non vide.
+   Exemple : /public/app/index.php/login → /login
+
+3. REQUEST_URI (par défaut) :
+   - Parse l'URL pour extraire le chemin
+   - Retire le chemin de base du script (SCRIPT_NAME)
+   - Retire /index.php si présent
+   Exemple : /public/app/index.php/dashboard → /dashboard
+
+Le chemin est normalisé : trim des slashes, '/' par défaut.
+
+
+6. RESPONSE — app/Core/Response.php
+===================================
+
+Namespace : CheckMaster\Core
+Classe    : Response (final)
+
+Propriétés :
+- int    $status  → Code HTTP (défaut: 200)
+- array  $headers → En-têtes HTTP [clé => valeur]
+- string $body    → Corps de la réponse
+
+Constructeur : __construct(string $body = '', int $status = 200, array $headers = [])
+
+Méthodes :
+- static redirect(string $location, int $status = 302): self
+  Crée une réponse de redirection avec l'en-tête Location.
+
+- send(): void
+  Émet la réponse HTTP :
+  1. http_response_code($this->status)
+  2. Envoie chaque en-tête via header()
+  3. echo $this->body
+
+
+7. SESSION — app/Core/Session.php
+=================================
+
+Namespace : CheckMaster\Core
+Classe    : Session (final)
+
+Méthodes :
+- static start(): void
+  Démarre la session PHP avec sécurité renforcée :
+  - lifetime = 0 (expire à la fermeture du navigateur)
+  - httponly = true (impossible d'accéder au cookie via JavaScript)
+  - samesite = 'Lax' (protection CSRF basique)
+  - secure = true uniquement si HTTPS est actif
+  - Ne démarre pas si une session est déjà active
+
+- static regenerate(): void
+  Régénère l'ID de session avec suppression de l'ancien.
+  Protection contre le vol de session (session fixation).
+  Démarre la session si elle n'est pas active.
+
+
+8. CSRF — app/Core/Csrf.php
+============================
+
+Namespace : CheckMaster\Core
+Classe    : Csrf (final)
+
+Constante privée : SESSION_KEY = 'csrf_token'
+
+Méthodes :
+- static token(): string
+  Génère ou retourne un token CSRF :
+  1. Démarre la session
+  2. Si aucun token existe → génère via random_bytes(32) → bin2hex
+  3. Stocke dans $_SESSION['csrf_token']
+  4. Retourne le token (64 caractères hexadécimaux)
+
+- static validate(?string $token): bool
+  Valide un token CSRF :
+  1. Démarre la session
+  2. Récupère le token attendu depuis $_SESSION
+  3. Utilise hash_equals() pour comparaison à timing constant
+     (protection contre les attaques de timing)
+
+
+9. DATABASE — app/config/Database.php
+=====================================
+
+Classe globale : Database (pas de namespace)
+
+Configuration :
+- host    : 'localhost'
+- db      : 'ufrmi1802974_2q2mpf'
+- user    : 'root'
+- pass    : '' (vide — développement local)
+- charset : 'utf8'
+
+Méthodes :
+- static getConfig(): array
+  Retourne la configuration sous forme de tableau associatif.
+
+- static getConnection(): PDO
+  Crée et retourne une instance PDO :
+  - DSN : mysql:host=...;dbname=...;charset=...
+  - ERRMODE_EXCEPTION activée
+  - En cas d'erreur → log dans error_log + die() avec message générique
+
+La classe est conditionnelle (class_exists) pour éviter les redéfinitions.
+
+
+10. SUPPORT DATABASE — app/Support/Database.php
+===============================================
+
+Namespace : App\Support
+Classe    : Database (final)
+
+Wrapper injectable autour de la classe statique Database.
+
+Méthode :
+- pdo(): PDO
+  Retourne l'instance PDO (singleton par instance de Database).
+  Appelle Database::getConnection() à la première invocation.
+
+Utilisé dans les services et middlewares pour l'injection de dépendance :
+  $db = new App\Support\Database();
+  $pdo = $db->pdo();
+
+
+11. FLUX DE REQUÊTE (REQUEST FLOW)
+==================================
+
+Le parcours complet d'une requête dans l'application :
+
+  1. public/app/index.php (point d'entrée)
+       ↓
+  2. Chargement Autoload.php (Composer + SPL fallback)
+       ↓
+  3. Bootstrap::init() (configuration erreurs)
+       ↓
+  4. Session::start() (démarrage session sécurisée)
+       ↓
+  5. Request::fromGlobals() (résolution méthode, chemin, paramètres)
+       ↓
+  6. PermissionMiddleware → vérification des permissions
+       a. RouteActionResolver::resolve() construit les patterns de route
+       b. PermissionRegistry::isPublicRoute() vérifie les routes publiques
+       c. Requête table route_actions en base
+       d. LegacyActionResolver fallback si pas de mapping DB
+       e. Résolution du feature/permission
+       f. AuthorizationService::canAccessLegacyRequest() vérifie le groupe
+       g. Redirection vers access_denied si refusé
+       ↓
+  7. Routage vers le contrôleur approprié selon ?page=...
+       ↓
+  8. Exécution du contrôleur → Service → Modèle → Base de données
+       ↓
+  9. Rendu de la vue (include des fichiers .php dans ressources/views/)
+       ↓
+  10. Response::send() (en production, les contrôleurs utilisent leur propre
+      mécanisme de rendu via include des vues plutôt que Response)
+
+
+12. CONVENTIONS DE NAMESPACES
+=============================
+
+Namespaces actifs (autoloadés via SPL) :
+  - CheckMaster\Core\        → app/Core/
+  - CheckMaster\Security\    → app/Security/
+  - CheckMaster\Services\    → app/Services/ (partiel)
+  - App\Support\             → app/Support/ (via Composer PSR-4)
+  - App\Utils\               → app/utils/ (via Composer PSR-4)
+
+Classes sans namespace (chargées via require_once) :
+  - Controllers  : AuthController, CandidatureSoutenanceController, etc.
+  - Services     : AuthService, GestionRapportService, etc. (certains)
+  - Models       : Utilisateur, Etudiant, Enseignant, Permission, etc.
+
+Pattern d'inclusion typique dans un contrôleur :
+  require_once __DIR__ . '/../config/database.php';
+  require_once __DIR__ . '/../Services/FooService.php';
+  require_once __DIR__ . '/../utils/permissions_helper.php';
+
+La configuration Composer PSR-4 (composer.json) mappe :
+  App\ → src/ et app/ (pour les classes modernes avec namespace)
+
+
+13. CONVENTIONS DE CODAGE
+=========================
+
+- Classes Core : final, déclarées avec declare(strict_types=1)
+- Pas de framework de templates : les vues sont des fichiers PHP purs
+  inclus via include/require depuis ressources/views/
+- Variables globales $GLOBALS utilisées pour passer des données aux vues
+  (pattern legacy)
+- Accès à la base de données : via Database::getConnection() statique
+- Pas d'ORM : requêtes SQL brutes dans les modèles/services via PDO
+- Middleware manuel : vérification des permissions dans chaque contrôleur
+  ou via le layout principal (layout.php)
+
+
+14. SÉCURITÉ — RÉSUMÉ DES COUCHES
+==================================
+
+1. Bootstrap : erreurs masquées en production
+2. Session : cookies sécurisés (httponly, samesite=Lax)
+3. Csrf : protection par token dans les formulaires POST
+4. PermissionMiddleware : vérification RBAC sur chaque page
+5. DbRateLimiter : protection brute-force sur le login
+6. AuthorizationService : résolution fine des permissions par feature/action
+
+
+================================================================================
+  FIN DE LA DOCUMENTATION ARCHITECTURE CORE
+================================================================================

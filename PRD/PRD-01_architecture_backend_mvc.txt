@@ -1,0 +1,171 @@
+# PRD-01 - Architecture backend cible MVC
+
+## Metadata
+- Version: 1.0
+- Date: 2026-03-14
+- Source d'analyse: `docs3\*.txt` + `docs3\audit.txt`
+- Portee: backend uniquement
+
+## Resume executif
+Ce PRD definit l'architecture cible globale pour transformer CheckMaster en backend MVC lisible, maintenable, fluide et evolutif, sans changer le design front ni le schema de base de donnees.
+
+## Contexte et probleme
+Les documents `docs3` montrent une architecture hybride avec:
+- 42 controllers, 45 services, 48 models.
+- Forte duplication SQL et services "god class".
+- Couplage fort entre HTTP, logique metier et acces donnees.
+- Heterogeneite de conventions de code.
+
+## Objectifs
+1. Normaliser une architecture en couches: Controller -> Service -> Repository -> QueryBuilder/ORM.
+2. Rendre le backend comprehensible et testable.
+3. Conserver 100% des fonctionnalites existantes (etudiant, enseignant, scolarite, commission, admin, archives).
+4. Assurer la compatibilite progressive avec les routes legacy `?page=...&action=...`.
+
+## Hors perimetre
+- Aucune refonte UI/UX.
+- Aucune modification CSS, composants visuels, templates design.
+- Aucune modification du schema BDD.
+
+## Contraintes non negociables
+1. **BDD intouchable**: interdit de faire `ALTER TABLE`, `CREATE/DROP TABLE`, `CREATE/DROP INDEX`, `VIEW`, `TRIGGER`, `PROCEDURE`.
+2. **Source de verite schema**: toutes les requetes et mappings doivent s'aligner sur `docs3\audit.txt`.
+3. **Backend only**: la refonte ne doit pas changer le rendu visuel.
+4. **Compat legacy**: les parcours actuels doivent continuer a fonctionner pendant la migration.
+5. **Erreurs explicites**: pas de silent failure, pas de fallback qui cache les erreurs.
+
+## Architecture cible
+```text
+HTTP Request
+  -> Router (legacy + moderne)
+    -> Controller (orchestration HTTP)
+      -> Service metier (regles, transactions, use-cases)
+        -> Repository (acces donnees par aggregate)
+          -> QueryBuilder / ORM mapper (PDO)
+            -> MySQL (schema inchange)
+```
+
+## Domaines fonctionnels cibles
+- Domaine Auth/RBAC
+- Domaine Etudiant/Scolarite
+- Domaine Rapport/Candidature
+- Domaine Commission/Evaluation/Soutenance
+- Domaine Documents/PDF/Export
+- Domaine Parametrage/Administration
+- Domaine Archives/Historique
+
+## Exigences fonctionnelles (FR)
+- FR-01: chaque endpoint est porte par un controller fin.
+- FR-02: aucune regle metier complexe en controller.
+- FR-03: chaque use-case est porte par un service dedie.
+- FR-04: aucun SQL brut en controller.
+- FR-05: repositories dedies par aggregate metier.
+- FR-06: routage compatible legacy + routage cible unifie.
+- FR-07: journalisation coherente des actions critiques.
+- FR-08: conservation des workflows actuels de soutenance.
+
+## Exigences non fonctionnelles (NFR)
+- NFR-01: lisibilite (classes courtes, responsabilite unique).
+- NFR-02: testabilite (services testables sans HTTP).
+- NFR-03: observabilite (logs d'erreur et traces metier).
+- NFR-04: performance (reduction N+1, cache cible PRD-05).
+- NFR-05: securite (RBAC et CSRF conserves/renforces).
+
+## Modules impactes (niveau macro)
+- Controllers: `AuthController`, `GestionRapportController`, `EvaluationDossiersController`, `ProgrammationSoutenanceController`, `GestionEtudiantController`, `ParametreController`, `Archive*Controller`.
+- Services: `GestionRapportService`, `EvaluationSoutenanceService`, `ProgrammationSoutenanceService`, `Dashboard*Service`, `GestionScolariteService`, `AuthService`.
+- Models: `Etudiant`, `Scolarite`, `RapportEtudiant`, `Approuver/Valider`, `Utilisateur`, `Archive`.
+
+## Tables de reference (sans changement schema)
+- `etudiants`, `inscriptions`, `rapport_etudiants`, `candidature_soutenance`
+- `valider`, `evaluations_rapports`, `programmer_soutenance`, `enseignant_jury`
+- `utilisateur`, `groupe_utilisateur`, `permissions`, `route_actions`
+- `annee_academique`, `niveau_etude`, `personnel_admin`, `pister`
+
+## Plan d'implementation
+1. Poser le socle technique (DI, routing, base controller).
+2. Poser la couche donnees (repositories + query builder + ORM mapper).
+3. Migrer les services transverses (validation, date, cache, audit).
+4. Refactoriser les workflows metier par domaine.
+5. Durcir securite et finaliser migration progressive.
+
+## Criteres d'acceptation
+- Tous les parcours documentes dans `docs3\04..10` restent disponibles.
+- Aucun changement de schema BDD.
+- Couche backend lisible avec separation claire des responsabilites.
+- Tous les nouveaux composants imposes sont planifies dans les PRD 02-09.
+
+## Risques et mitigations
+- Risque: regression sur routes legacy.  
+  Mitigation: adaptateur de routage et tests de non-regression.
+- Risque: duplication temporaire pendant migration.  
+  Mitigation: strategie strangler + deprecation explicite.
+- Risque: divergence schema/code.  
+  Mitigation: checklist obligatoire "audit.txt compatible".
+
+## KPI de succes
+- 0 SQL direct en controller.
+- 100% des use-cases critiques portes par services dedies.
+- Reduction de la taille des classes "god service".
+- Stabilite fonctionnelle: aucun parcours metier casse.
+
+## Annexe detaillee A - blueprint complet de l'architecture cible
+
+### Decoupage technique par couche (niveau implementation)
+#### 1) Controller layer
+- Responsabilites strictes: parsing input, appel service, mapping response.
+- Interdits: SQL, logique metier, transformation lourde de donnees.
+- Contrat standard par action:
+  - Input DTO valide
+  - Appel unique vers un use-case service
+  - Mapping erreur metier -> HTTP code
+  - Trace technique (request id, action, actor)
+
+#### 2) Service layer
+- Responsabilites: orchestration metier, regles, transactions metier.
+- Interdits: acces direct superglobales PHP, rendu HTML.
+- Contrat standard:
+  - Signature orientee use-case
+  - DTO d'entree et DTO de sortie
+  - Exceptions metier explicites
+
+#### 3) Repository layer
+- Responsabilites: lecture/ecriture aggregate, mapping resultats.
+- Interdits: logique metier transverse.
+- Convention: une methode repository correspond a une intention metier claire.
+
+#### 4) QueryBuilder / ORM mapper
+- Responsabilites: composition SQL sure, execution preparee, mapping row->entity.
+- Interdits: generation SQL non preparee, concatenation de filtres non whitelistes.
+
+### Matrice parcours metiers -> domaines applicatifs
+| Parcours (docs3) | Domaine principal | Sous-domaines |
+|---|---|---|
+| Etudiant | Candidature/Rapport | Validation, Reclamations, Notes |
+| Enseignant | Evaluation/Suivi | Repertoire, Compte rendu |
+| Scolarite | Inscriptions/Paiements | Etudiants, Reclamations |
+| Commission | Validation/Soutenance | Decisions, Programmation |
+| Administrateur | Parametrage/Securite | Utilisateurs, Audit, Archives |
+
+### Cible de structure de code (dossiers)
+- `app/Controllers/<Domaine>/...`
+- `app/Services/<Domaine>/...`
+- `app/Repositories/<Domaine>/...`
+- `app/Domain/<Domaine>/Entity|DTO|Exception`
+- `app/Support/Sql/...`
+- `app/Security/...`
+
+### Backlog technique atomique (niveau execution)
+1. Definir conventions de nommage des classes et methods.
+2. Definir gabarits de controller/service/repository.
+3. Mettre en place revues de code basees sur la separation des couches.
+4. Mettre en place la checklist "BDD intouchable" dans chaque merge.
+5. Formaliser les contrats d'erreurs par domaine.
+
+### Checklist de revue architecture (obligatoire)
+- [ ] Le controller est thin et ne contient pas de logique metier.
+- [ ] Le service encapsule une intention metier unique.
+- [ ] Le repository n'encode pas de regle metier.
+- [ ] Toutes les requetes respectent `docs3\audit.txt`.
+- [ ] Aucune commande SQL DDL n'a ete introduite.
+- [ ] Le design front est strictement inchange.
