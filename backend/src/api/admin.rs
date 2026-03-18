@@ -17,12 +17,6 @@ use crate::middleware::security::require_admin;
 
 /// Create admin router with admin-only access
 pub fn router() -> Router<Arc<AppState>> {
-    let admin_layer = middleware::from_fn_with_state(
-        // |state, request| async move {
-            require_admin(state, request).await
-        },
-    );
-
     Router::new()
         .route("/admin/users", get(list_users))
         .route("/admin/users/:id", put(update_user))
@@ -30,7 +24,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/admin/roles", post(create_role))
         .route("/admin/permissions", get(list_permissions))
         .route("/admin/stats", get(get_stats))
-        .route_layer(admin_layer)
 }
 
 /// List all users (admin only)

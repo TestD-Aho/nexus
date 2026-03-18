@@ -235,9 +235,10 @@ pub async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
             ON CONFLICT DO NOTHING"#).await?;
 
         // Record migration
-        pool.execute(
-            "INSERT INTO _nexus_migrations (name) VALUES ($1)"
-        ).bind(migration_name).await?;
+        sqlx::query("INSERT INTO _nexus_migrations (name) VALUES ($1)")
+            .bind(migration_name)
+            .execute(pool)
+            .await?;
 
         tracing::info!("✅ Migration {} completed", migration_name);
     }

@@ -7,8 +7,8 @@ import { PagesListPage } from './pages/PagesListPage';
 import { PageViewPage } from './pages/PageViewPage';
 import { PageEditorPage } from './pages/PageEditorPage';
 import { AdminPage } from './pages/AdminPage';
-import { PortfolioPage } from './pages/PortfolioPage';
-import { ProjectForm } from './components/ProjectForm';
+import PortfolioPage from './pages/PortfolioPage';
+import ProjectForm from './components/ProjectForm';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
