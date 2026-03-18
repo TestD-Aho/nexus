@@ -179,6 +179,7 @@ pub async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
             id INTEGER PRIMARY KEY DEFAULT 1,
             maintenance_mode BOOLEAN DEFAULT FALSE,
             maintenance_message TEXT,
+            cv_url VARCHAR(500),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )"#).await?;
 

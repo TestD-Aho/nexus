@@ -20,10 +20,10 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         // Public routes
         .route("/system/feature-flags", get(list_feature_flags))
-        .route("/system/maintenance", get(get_maintenance_mode))
+        .route("/system/settings", get(get_settings))
         // Protected routes - admin only
         .route("/system/feature-flags/:key", put(update_feature_flag))
-        .route("/system/maintenance", put(set_maintenance_mode))
+        .route("/system/settings", put(update_settings))
 }
 
 /// List all feature flags
@@ -74,58 +74,68 @@ pub async fn update_feature_flag(
     Ok(Json(flag))
 }
 
-/// Get maintenance mode status
-pub async fn get_maintenance_mode(
+/// Get system settings
+pub async fn get_settings(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let is_maintenance = state.is_maintenance_mode().await;
     
-    let message: Option<String> = sqlx::query(
-        "SELECT maintenance_message FROM system_settings WHERE id = 1"
+    let settings: Option<(bool, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT maintenance_mode, maintenance_message, cv_url FROM system_settings WHERE id = 1"
     )
     .fetch_optional(&state.db_pool)
     .await
     .ok()
-    .flatten()
-    .map(|row| row.get(0));
+    .flatten();
+
+    let (db_maintenance, message, cv_url) = settings.unwrap_or((false, None, None));
 
     Ok(Json(serde_json::json!({
         "maintenance_mode": is_maintenance,
-        "message": message
+        "message": message,
+        "cv_url": cv_url
     })))
 }
 
-/// Set maintenance mode
-pub async fn set_maintenance_mode(
+/// Update system settings
+pub async fn update_settings(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    let enabled = payload
-        .get("enabled")
-        .and_then(|v| v.as_bool())
-        .ok_or(StatusCode::BAD_REQUEST)?;
+    let mut updates = vec!["updated_at = NOW()".to_string()];
+    
+    if let Some(enabled) = payload.get("maintenance_mode").and_then(|v| v.as_bool()) {
+        updates.push(format!("maintenance_mode = {}", enabled));
+    }
+    
+    if let Some(message) = payload.get("message").and_then(|v| v.as_str()) {
+        updates.push("maintenance_message = $1".to_string());
+    } else if payload.get("message").is_some() {
+        updates.push("maintenance_message = NULL".to_string());
+    }
+    
+    if let Some(cv_url) = payload.get("cv_url").and_then(|v| v.as_str()) {
+        updates.push("cv_url = $2".to_string());
+    } else if payload.get("cv_url").is_some() {
+        updates.push("cv_url = NULL".to_string());
+    }
 
-    let message = payload
-        .get("message")
-        .and_then(|v| v.as_str());
+    let set_clause = updates.join(", ");
+    let query = format!("UPDATE system_settings SET {} WHERE id = 1", set_clause);
+    
+    let message = payload.get("message").and_then(|v| v.as_str());
+    let cv_url = payload.get("cv_url").and_then(|v| v.as_str());
 
-    // Update database
-    sqlx::query(
-        "UPDATE system_settings SET maintenance_mode = $1, maintenance_message = $2, updated_at = NOW() WHERE id = 1"
-    )
-    .bind(enabled)
-    .bind(message)
-    .execute(&state.db_pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    sqlx::query(&query)
+        .bind(message)
+        .bind(cv_url)
+        .execute(&state.db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Update in-memory cache
-    state.set_maintenance_mode(enabled).await;
+    if let Some(enabled) = payload.get("maintenance_mode").and_then(|v| v.as_bool()) {
+        state.set_maintenance_mode(enabled).await;
+    }
 
-    tracing::info!("Maintenance mode set to: {}", enabled);
-
-    Ok(Json(serde_json::json!({
-        "maintenance_mode": enabled,
-        "message": message
-    })))
+    get_settings(State(state)).await
 }
