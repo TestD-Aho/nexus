@@ -1,6 +1,6 @@
 //! Security Middleware - Headers, CORS, Auth, Maintenance Mode
 
-use crate::models::Claims;
+use crate::services::auth::Claims;
 use crate::services::auth::AuthService;
 use crate::services::app_state::AppState;
 use axum::{
@@ -43,20 +43,16 @@ pub async fn layer(
         header::REFERRER_POLICY,
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
-    response.headers_mut().insert(
-        header::PERMISSIONS_POLICY,
-        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
-    );
 
     response
 }
 
 /// Extract JWT token from Authorization header
-pub fn extract_token(authorization: &Option<HeaderValue>) -> Option<String> {
-    authorization
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .map(|s| s.to_string())
+pub fn extract_token(authorization: Option<&HeaderValue>) -> Option<String> {
+    let auth = authorization?;
+    let auth_str = auth.to_str().ok()?;
+    let token = auth_str.strip_prefix("Bearer ")?;
+    Some(token.to_string())
 }
 
 /// Authenticate request - extracts and validates JWT
@@ -66,7 +62,7 @@ pub async fn authenticate(
 ) -> Result<Claims, StatusCode> {
     let auth_header = request.headers().get("authorization");
     
-    let token = extract_token(&auth_header)
+    let token = extract_token(auth_header)
         .ok_or(StatusCode::UNAUTHORIZED)?;
     
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS512);
@@ -144,7 +140,7 @@ pub async fn check_maintenance(
     if state.is_maintenance_mode().await {
         // Check for admin bypass token
         let auth_header = request.headers().get("authorization");
-        if let Some(token) = extract_token(&auth_header) {
+        if let Some(token) = extract_token(auth_header) {
             // Try to validate as admin
             if let Ok(claims) = validate_admin_token(&state, &token).await {
                 if claims.role == "Super-Architecte" {

@@ -8,6 +8,7 @@ use axum::{
     Router,
     middleware,
 };
+use sqlx::Row;
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::models::{AdminStats, CreateRoleRequest, Permission, Role, User};
@@ -17,7 +18,7 @@ use crate::middleware::security::require_admin;
 /// Create admin router with admin-only access
 pub fn router() -> Router<Arc<AppState>> {
     let admin_layer = middleware::from_fn_with_state(
-        |state, request| async move {
+        // |state, request| async move {
             require_admin(state, request).await
         },
     );

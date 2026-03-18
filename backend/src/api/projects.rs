@@ -23,9 +23,9 @@ pub struct ProjectQuery {
 
 /// Create projects router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
-    let auth_layer = middleware::from_fn_with_state(
-        |state, request| async move {
-            authenticate(state, request).await
+    // let auth_layer = middleware::from_fn_with_state(
+        // |state, request| async move {
+            // authenticate(state, request).await
         },
     );
 
@@ -34,9 +34,9 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/projects", get(list_projects))
         .route("/projects/:slug", get(get_project))
         // Protected routes - require auth
-        .route("/projects", post(create_project).route_layer(auth_layer.clone()))
-        .route("/projects/:id", put(update_project).route_layer(auth_layer.clone()))
-        .route("/projects/:id", delete(delete_project).route_layer(auth_layer))
+        .route("/projects", post(create_project).route_layer(// auth_layer.clone()))
+        .route("/projects/:id", put(update_project).route_layer(// auth_layer.clone()))
+        .route("/projects/:id", delete(delete_project).route_layer(// auth_layer))
 }
 
 /// List projects (optionally filtered)

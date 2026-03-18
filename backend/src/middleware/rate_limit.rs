@@ -1,6 +1,6 @@
 //! Rate Limiting Middleware
 
-use crate::services::app_state::AppState;
+use crate::services::app_state::{AppState, RateLimitEntry};
 use axum::{
     body::Body,
     extract::{Request, State},
@@ -8,28 +8,8 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use governor::{
-    clock::DefaultClock,
-    middleware::NoOpMiddleware,
-    state::{keyed::DefaultKeyedStateStore, InMemoryState},
-    Quota, RateLimiter,
-};
 use std::sync::Arc;
 use std::time::Duration;
-use tower::limit::GlobalConcurrencyLimitLayer;
-use tower::ServiceBuilder;
-
-/// Rate limiter type
-type RateLimiterT = RateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock, NoOpMiddleware>;
-
-/// Create rate limiter middleware
-pub fn create_rate_limiter(max_requests: u32, window_secs: u64) -> RateLimiterT {
-    RateLimiter::keyed(
-        Quota::with_period(Duration::from_secs(window_secs))
-            .unwrap()
-            .allow_hits(max_requests),
-    )
-}
 
 /// Rate limit middleware layer
 pub async fn layer(
@@ -45,49 +25,55 @@ pub async fn layer(
     // Get client identifier (IP or user ID if authenticated)
     let client_id = get_client_id(&request);
     
-    // Check rate limit (simple in-memory implementation)
-    let rate_limit_state = state.rate_limit_state.read().await;
-    
-    let entry = rate_limit_state.entry(client_id.clone()).or_insert_with(|| {
-        RateLimitEntry {
-            requests: 0,
-            window_start: std::time::Instant::now(),
-        }
-    });
-    
     let window_duration = Duration::from_secs(state.config.rate_limit_window_secs);
+    let max_requests = state.config.rate_limit_requests;
     
-    // Reset window if expired
-    if entry.window_start.elapsed() > window_duration {
-        entry.requests = 0;
-        entry.window_start = std::time::Instant::now();
-    }
+    // Check rate limit (simple in-memory implementation)
+    let (requests, window_start, is_limited) = {
+        let mut rate_limit_state = state.rate_limit_state.write().await;
+        
+        let entry = rate_limit_state.entry(client_id.clone()).or_insert_with(|| {
+            RateLimitEntry {
+                requests: 0,
+                window_start: std::time::Instant::now(),
+            }
+        });
+        
+        // Reset window if expired
+        if entry.window_start.elapsed() > window_duration {
+            entry.requests = 0;
+            entry.window_start = std::time::Instant::now();
+        }
+        
+        // Check limit
+        let is_limited = entry.requests >= max_requests;
+        entry.requests += 1;
+        
+        (entry.requests, entry.window_start, is_limited)
+    };
     
-    // Check limit
-    if entry.requests >= state.config.rate_limit_requests {
+    // Check limit after releasing the lock
+    if is_limited {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             r#"{"error": "rate_limit_exceeded", "message": "Too many requests. Please try again later."}"#
         ).into_response();
     }
     
-    entry.requests += 1;
-    drop(rate_limit_state);
-    
     let mut response = next.run(request).await;
     
     // Add rate limit headers
     response.headers_mut().insert(
         "X-RateLimit-Limit",
-        HeaderValue::from(state.config.rate_limit_requests),
+        HeaderValue::from(max_requests),
     );
     response.headers_mut().insert(
         "X-RateLimit-Remaining",
-        HeaderValue::from(state.config.rate_limit_requests.saturating_sub(entry.requests)),
+        HeaderValue::from(max_requests.saturating_sub(requests)),
     );
     response.headers_mut().insert(
         "X-RateLimit-Reset",
-        HeaderValue::from(entry.window_start.elapsed().as_secs() + window_duration.as_secs()),
+        HeaderValue::from(window_start.elapsed().as_secs() + window_duration.as_secs()),
     );
     
     response
@@ -123,10 +109,4 @@ fn get_client_id(request: &Request<Body>) -> String {
     }
     
     "ip:unknown".to_string()
-}
-
-/// Rate limit entry for tracking
-struct RateLimitEntry {
-    requests: u32,
-    window_start: std::time::Instant,
 }

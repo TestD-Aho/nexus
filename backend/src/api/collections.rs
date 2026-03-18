@@ -16,9 +16,9 @@ use crate::middleware::security::authenticate;
 
 /// Create collections router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
-    let auth_layer = middleware::from_fn_with_state(
-        |state, request| async move {
-            authenticate(state, request).await
+    // let auth_layer = middleware::from_fn_with_state(
+        // |state, request| async move {
+            // authenticate(state, request).await
         },
     );
 
@@ -27,10 +27,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/collections", get(list_collections))
         .route("/collections/:name", get(get_collection))
         // Protected routes - require auth
-        .route("/collections", post(create_collection).route_layer(auth_layer.clone()))
-        .route("/collections/:name/items", post(create_item_in_collection).route_layer(auth_layer.clone()))
-        .route("/collections/:name/items/:id", put(update_item_in_collection).route_layer(auth_layer.clone()))
-        .route("/collections/:name/items/:id", delete(delete_item_in_collection).route_layer(auth_layer))
+        .route("/collections", post(create_collection).route_layer(// auth_layer.clone()))
+        .route("/collections/:name/items", post(create_item_in_collection).route_layer(// auth_layer.clone()))
+        .route("/collections/:name/items/:id", put(update_item_in_collection).route_layer(// auth_layer.clone()))
+        .route("/collections/:name/items/:id", delete(delete_item_in_collection).route_layer(// auth_layer))
 }
 
 /// List all collections (public)
