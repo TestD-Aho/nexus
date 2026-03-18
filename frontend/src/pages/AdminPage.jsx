@@ -9,6 +9,7 @@ export function AdminPage() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [maintenance, setMaintenance] = useState(false);
+  const [cvUrl, setCvUrl] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -22,11 +23,12 @@ export function AdminPage() {
       const [statsRes, usersRes, maintRes] = await Promise.all([
         admin.stats(),
         admin.users(),
-        system.maintenance(),
+        system.settings(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
       setMaintenance(maintRes.data.maintenance_mode);
+      setCvUrl(maintRes.data.cv_url || '');
     } catch (err) {
       console.error('Failed to load admin data:', err);
     }
@@ -34,10 +36,19 @@ export function AdminPage() {
 
   const toggleMaintenance = async () => {
     try {
-      await system.setMaintenance(!maintenance);
+      await system.updateSettings({ maintenance_mode: !maintenance });
       setMaintenance(!maintenance);
     } catch (err) {
       console.error('Failed to toggle maintenance:', err);
+    }
+  };
+
+  const updateCvUrl = async () => {
+    try {
+      await system.updateSettings({ cv_url: cvUrl });
+      alert('CV URL updated successfully!');
+    } catch (err) {
+      console.error('Failed to update CV URL:', err);
     }
   };
 
@@ -169,6 +180,22 @@ export function AdminPage() {
 
       {activeTab === 'system' && (
         <div className="system-section">
+          <h2>System Settings</h2>
+          <div className="settings-group" style={{ marginBottom: '30px' }}>
+            <h3>CV / Resume</h3>
+            <p>Enter the URL of your CV (e.g. from the Media Library) so visitors can download it.</p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <input 
+                type="text" 
+                value={cvUrl} 
+                onChange={(e) => setCvUrl(e.target.value)} 
+                placeholder="/uploads/my-cv.pdf" 
+                style={{ flex: 1, padding: '8px' }}
+              />
+              <button className="btn btn-primary" onClick={updateCvUrl}>Save</button>
+            </div>
+          </div>
+
           <h2>Quick Links</h2>
           <div className="quick-links">
             <Link to="/admin/page/new" className="quick-link-card">

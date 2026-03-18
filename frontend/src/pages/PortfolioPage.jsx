@@ -1,18 +1,31 @@
 // Portfolio Page
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projects } from '../api';
+import { projects, system } from '../api';
 import ProjectCard from '../components/ProjectCard';
 
 export default function PortfolioPage() {
   const [projectsList, setProjectsList] = useState([]);
+  const [cvUrl, setCvUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all' or 'featured'
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     loadProjects();
+    loadSettings();
   }, [filter, search]);
+
+  const loadSettings = async () => {
+    try {
+      const res = await system.settings();
+      if (res.data.cv_url) {
+        setCvUrl(res.data.cv_url);
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    }
+  };
 
   const loadProjects = async () => {
     setLoading(true);
@@ -37,10 +50,13 @@ export default function PortfolioPage() {
 
   return (
     <div className="portfolio-page">
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Portfolio</h1>
-        {/* Assuming there's a way to add new project, maybe admin only */}
-        {/* <Link to="/admin/project/new" className="btn-primary">+ New Project</Link> */}
+        {cvUrl && (
+          <a href={cvUrl} target="_blank" rel="noreferrer" className="btn btn-primary" download>
+            📄 Download CV
+          </a>
+        )}
       </div>
 
       <div className="filter-and-search">

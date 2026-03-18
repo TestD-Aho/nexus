@@ -65,6 +65,7 @@ pub struct Page {
 #[serde(rename_all = "PascalCase")]
 pub enum BlockType {
     HeroHeader,
+    WorkProcess,
     RichText,
     ProjectGrid,
     SkillMatrix,
@@ -77,6 +78,7 @@ impl std::fmt::Display for BlockType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BlockType::HeroHeader => write!(f, "HeroHeader"),
+            BlockType::WorkProcess => write!(f, "WorkProcess"),
             BlockType::RichText => write!(f, "RichText"),
             BlockType::ProjectGrid => write!(f, "ProjectGrid"),
             BlockType::SkillMatrix => write!(f, "SkillMatrix"),
@@ -93,6 +95,7 @@ impl std::str::FromStr for BlockType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "HeroHeader" => Ok(BlockType::HeroHeader),
+            "WorkProcess" => Ok(BlockType::WorkProcess),
             "RichText" => Ok(BlockType::RichText),
             "ProjectGrid" => Ok(BlockType::ProjectGrid),
             "SkillMatrix" => Ok(BlockType::SkillMatrix),
@@ -175,8 +178,31 @@ pub struct CollectionItem {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Project model
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Project {
+    pub id: Uuid,
+    pub title: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub challenge: Option<String>,
+    pub solution: Option<String>,
+    pub stack: Option<serde_json::Value>,
+    pub role: Option<String>,
+    pub live_url: Option<String>,
+    pub repo_url: Option<String>,
+    pub media_ids: Option<serde_json::Value>,
+    pub technologies: Option<serde_json::Value>,
+    pub featured: bool,
+    pub published: bool,
+    pub published_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Media item
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+
 pub struct Media {
     pub id: Uuid,
     pub filename: String,
@@ -345,4 +371,40 @@ pub struct AdminStats {
     pub total_collections: i64,
     pub total_media: i64,
     pub active_sessions: i64,
+}
+
+/// Create project request
+#[derive(Debug, Deserialize)]
+pub struct CreateProjectRequest {
+    pub title: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub challenge: Option<String>,
+    pub solution: Option<String>,
+    pub stack: Option<serde_json::Value>,
+    pub role: Option<String>,
+    pub live_url: Option<String>,
+    pub repo_url: Option<String>,
+    pub media_ids: Option<serde_json::Value>,
+    pub technologies: Option<serde_json::Value>,
+    pub featured: Option<bool>,
+    pub published_at: Option<DateTime<Utc>>,
+}
+
+/// Update project request
+#[derive(Debug, Deserialize)]
+pub struct UpdateProjectRequest {
+    pub title: Option<String>,
+    pub slug: Option<String>,
+    pub description: Option<String>,
+    pub challenge: Option<String>,
+    pub solution: Option<String>,
+    pub stack: Option<serde_json::Value>,
+    pub role: Option<String>,
+    pub live_url: Option<String>,
+    pub repo_url: Option<String>,
+    pub media_ids: Option<serde_json::Value>,
+    pub technologies: Option<serde_json::Value>,
+    pub featured: Option<bool>,
+    pub published_at: Option<DateTime<Utc>>,
 }

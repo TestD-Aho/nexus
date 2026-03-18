@@ -1,14 +1,18 @@
 // Nexus CMS - Main App
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { PagesListPage } from './pages/PagesListPage';
 import { PageViewPage } from './pages/PageViewPage';
 import { PageEditorPage } from './pages/PageEditorPage';
 import { AdminPage } from './pages/AdminPage';
-import { PortfolioPage } from './pages/PortfolioPage';
-import { ProjectForm } from './components/ProjectForm';
+import PortfolioPage from './pages/PortfolioPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import ProjectForm from './components/ProjectForm';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -37,6 +41,9 @@ function AppRoutes() {
       <Route path="/" element={<Layout><PagesListPage /></Layout>} />
       <Route path="/page/:slug" element={<Layout><PageViewPage /></Layout>} />
       <Route path="/portfolio" element={<Layout><PortfolioPage /></Layout>} />
+      <Route path="/project/:slug" element={<Layout><ProjectDetailPage /></Layout>} />
+      <Route path="/blog" element={<Layout><BlogPage /></Layout>} />
+      <Route path="/blog/:id" element={<Layout><BlogPostPage /></Layout>} />
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       
       {/* Protected Routes */}
@@ -54,9 +61,11 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

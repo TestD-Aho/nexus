@@ -22,12 +22,6 @@ pub struct PageQuery {
 
 /// Create pages router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
-    // let auth_layer = middleware::from_fn_with_state(
-    //     |state, request| async move {
-    //         authenticate(state, request).await
-    //     },
-    // );
-
     Router::new()
         // Public routes - anyone can read
         .route("/pages", get(list_pages))

@@ -1,0 +1,32 @@
+.block-work-process {
+  padding: var(--space-4) 0;
+}
+
+.work-process-steps {
+  list-style: none;
+  counter-reset: process-counter;
+  margin-top: var(--space-3);
+}
+
+.process-step {
+  position: relative;
+  padding-left: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.process-step::before {
+  counter-increment: process-counter;
+  content: counter(process-counter);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}

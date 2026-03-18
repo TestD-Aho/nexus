@@ -23,21 +23,15 @@ pub struct BlockQuery {
 
 /// Create blocks router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
-    // let auth_layer = middleware::from_fn_with_state(
-        // |state, request| async move {
-            // authenticate(state, request).await
-        },
-    );
-
     Router::new()
         // Public routes - anyone can read
         .route("/blocks", get(list_blocks))
         .route("/blocks/:id", get(get_block))
         // Protected routes - require auth
-        .route("/blocks", post(create_block).route_layer(// auth_layer.clone()))
-        .route("/blocks/:id", put(update_block).route_layer(// auth_layer.clone()))
-        .route("/blocks/:id", delete(delete_block).route_layer(// auth_layer.clone()))
-        .route("/blocks/reorder", post(reorder_blocks).route_layer(// auth_layer))
+        .route("/blocks", post(create_block))
+        .route("/blocks/:id", put(update_block))
+        .route("/blocks/:id", delete(delete_block))
+        .route("/blocks/reorder", post(reorder_blocks))
 }
 
 /// List blocks (optionally filtered by page)
@@ -147,7 +141,7 @@ pub async fn update_block(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateBlockRequest>,
 ) -> Result<Json<Block>, StatusCode> {
-    sqlx::query(
+    sqlx::query_as::<_, Block>(
         r#"UPDATE blocks SET
             block_type = COALESCE($2, block_type),
             title = COALESCE($3, title),

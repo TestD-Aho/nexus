@@ -1,0 +1,23 @@
+.block-hero {
+  padding: var(--space-4);
+  text-align: center;
+  background-size: cover;
+  background-position: center;
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-content h1 {
+  font-size: 4rem;
+  margin-bottom: var(--space-2);
+}
+
+.hero-content p {
+  font-size: 1.5rem;
+  opacity: 0.9;
+}

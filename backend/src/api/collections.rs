@@ -16,21 +16,15 @@ use crate::middleware::security::authenticate;
 
 /// Create collections router with per-route security
 pub fn router() -> Router<Arc<AppState>> {
-    // let auth_layer = middleware::from_fn_with_state(
-        // |state, request| async move {
-            // authenticate(state, request).await
-        },
-    );
-
     Router::new()
         // Public routes - anyone can read
         .route("/collections", get(list_collections))
         .route("/collections/:name", get(get_collection))
         // Protected routes - require auth
-        .route("/collections", post(create_collection).route_layer(// auth_layer.clone()))
-        .route("/collections/:name/items", post(create_item_in_collection).route_layer(// auth_layer.clone()))
-        .route("/collections/:name/items/:id", put(update_item_in_collection).route_layer(// auth_layer.clone()))
-        .route("/collections/:name/items/:id", delete(delete_item_in_collection).route_layer(// auth_layer))
+        .route("/collections", post(create_collection))
+        .route("/collections/:name/items", post(create_item_in_collection))
+        .route("/collections/:name/items/:id", put(update_item_in_collection))
+        .route("/collections/:name/items/:id", delete(delete_item_in_collection))
 }
 
 /// List all collections (public)
@@ -152,7 +146,7 @@ pub async fn update_item_in_collection(
     Path((_name, id)): Path<(String, Uuid)>,
     Json(payload): Json<UpdateCollectionItemRequest>,
 ) -> Result<Json<CollectionItem>, StatusCode> {
-    sqlx::query(
+    sqlx::query_as::<_, CollectionItem>(
         "UPDATE collection_items SET data = $2, updated_at = NOW() WHERE id = $1 RETURNING *"
     )
     .bind(id)

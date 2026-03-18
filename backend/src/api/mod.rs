@@ -8,6 +8,7 @@ pub mod collections;
 pub mod admin;
 pub mod system;
 pub mod media;
+pub mod projects;
 
 use axum::Router;
 use std::sync::Arc;
@@ -24,5 +25,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(admin::router())
         .merge(system::router())
         .merge(media::router())
+        .merge(projects::router())
         .with_state(state)
 }
