@@ -95,6 +95,21 @@ function BlockRenderer({ block }) {
         </section>
       );
 
+    case 'WorkProcess':
+      return (
+        <section className="block-work-process">
+          <h2>{title || 'Work Process'}</h2>
+          <ol className="work-process-steps">
+            {(content?.steps || []).map((step, i) => (
+              <li key={i} className="process-step">
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      );
+
     case 'SkillMatrix':
       return (
         <section className="block-skills">

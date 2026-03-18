@@ -4,6 +4,7 @@ import { blocks as blocksApi } from '../api';
 
 const BLOCK_TYPES = [
   { value: 'HeroHeader', label: 'Hero Header', icon: '🎯' },
+  { value: 'WorkProcess', label: 'Work Process', icon: '⚙️' },
   { value: 'RichText', label: 'Rich Text', icon: '📝' },
   { value: 'ProjectGrid', label: 'Project Grid', icon: '🗂️' },
   { value: 'SkillMatrix', label: 'Skill Matrix', icon: '⚡' },
@@ -14,6 +15,7 @@ const BLOCK_TYPES = [
 // Default content for each block type
 const DEFAULT_CONTENT = {
   HeroHeader: { title: 'Welcome', subtitle: 'Your subtitle here', backgroundImage: '' },
+  WorkProcess: { steps: [{ title: '', description: '' }] },
   RichText: { html: '<p>Your content here...</p>' },
   ProjectGrid: { title: 'My Projects', items: [] },
   SkillMatrix: { skills: [] },
@@ -218,6 +220,57 @@ function ContentEditor({ type, content, onChange }) {
           />
         </div>
       );
+    case 'WorkProcess':
+      return (
+        <div className="form-group">
+          <label>Work Process Steps</label>
+          {(content.steps || []).map((step, index) => (
+            <div key={index} className="step-editor" style={{ marginBottom: '10px', padding: '10px', border: '1px solid #ccc' }}>
+              <input 
+                placeholder="Step Title"
+                value={step.title || ''} 
+                onChange={e => {
+                  const newSteps = [...(content.steps || [])];
+                  newSteps[index] = { ...step, title: e.target.value };
+                  onChange({ ...content, steps: newSteps });
+                }} 
+                style={{ display: 'block', marginBottom: '5px' }}
+              />
+              <textarea 
+                placeholder="Step Description"
+                value={step.description || ''} 
+                onChange={e => {
+                  const newSteps = [...(content.steps || [])];
+                  newSteps[index] = { ...step, description: e.target.value };
+                  onChange({ ...content, steps: newSteps });
+                }} 
+                rows={2}
+                style={{ display: 'block', width: '100%', marginBottom: '5px' }}
+              />
+              <button 
+                type="button" 
+                onClick={() => {
+                  const newSteps = [...(content.steps || [])];
+                  newSteps.splice(index, 1);
+                  onChange({ ...content, steps: newSteps });
+                }}
+                className="btn-danger"
+              >
+                Remove Step
+              </button>
+            </div>
+          ))}
+          <button 
+            type="button" 
+            onClick={() => {
+              const newSteps = [...(content.steps || []), { title: '', description: '' }];
+              onChange({ ...content, steps: newSteps });
+            }}
+          >
+            + Add Step
+          </button>
+        </div>
+      );
     case 'SkillMatrix':
       return (
         <div className="form-group">
@@ -253,6 +306,8 @@ function renderBlockPreview(block) {
       return <div className="preview-text" dangerouslySetInnerHTML={{ __html: content?.html }} />;
     case 'ProjectGrid':
       return <div className="preview-grid">{content?.items?.length || 0} projects</div>;
+    case 'WorkProcess':
+      return <div className="preview-process">{content?.steps?.length || 0} steps</div>;
     case 'SkillMatrix':
       return <div className="preview-skills">{(content?.skills || []).join(', ')}</div>;
     default:

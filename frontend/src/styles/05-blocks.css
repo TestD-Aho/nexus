@@ -233,3 +233,42 @@
   border-left: 4px solid var(--primary);
   margin-bottom: 1rem;
 }
+
+.block-work-process {
+  padding: 4rem 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.work-process-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: process-counter;
+}
+
+.process-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.process-step::before {
+  content: counter(process-counter);
+  counter-increment: process-counter;
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  width: 30px;
+  height: 30px;
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}

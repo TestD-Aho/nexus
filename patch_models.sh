@@ -1,0 +1,3 @@
+#!/bin/bash
+sed -i '/pub struct Media {/i \
+/// Project model\n#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]\npub struct Project {\n    pub id: Uuid,\n    pub title: String,\n    pub slug: String,\n    pub description: Option<String>,\n    pub challenge: Option<String>,\n    pub solution: Option<String>,\n    pub stack: Option<serde_json::Value>,\n    pub role: Option<String>,\n    pub live_url: Option<String>,\n    pub repo_url: Option<String>,\n    pub media_ids: Option<serde_json::Value>,\n    pub technologies: Option<serde_json::Value>,\n    pub featured: bool,\n    pub published: bool,\n    pub published_at: Option<DateTime<Utc>>,\n    pub created_at: DateTime<Utc>,\n    pub updated_at: DateTime<Utc>,\n}\n' backend/src/models/mod.rs

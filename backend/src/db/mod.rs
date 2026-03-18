@@ -143,6 +143,27 @@ pub async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )"#).await?;
 
+        // Projects table
+        pool.execute(r#"CREATE TABLE IF NOT EXISTS projects (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL UNIQUE,
+            description TEXT,
+            challenge TEXT,
+            solution TEXT,
+            stack JSONB,
+            role VARCHAR(255),
+            live_url VARCHAR(500),
+            repo_url VARCHAR(500),
+            media_ids JSONB,
+            technologies JSONB,
+            featured BOOLEAN DEFAULT FALSE,
+            published BOOLEAN DEFAULT TRUE,
+            published_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )"#).await?;
+
         // Feature flags table
         pool.execute(r#"CREATE TABLE IF NOT EXISTS feature_flags (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
