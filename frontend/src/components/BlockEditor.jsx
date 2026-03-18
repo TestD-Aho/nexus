@@ -1,27 +1,7 @@
 // Block Editor Component
 import { useState } from 'react';
 import { blocks as blocksApi } from '../api';
-
-const BLOCK_TYPES = [
-  { value: 'HeroHeader', label: 'Hero Header', icon: '🎯' },
-  { value: 'WorkProcess', label: 'Work Process', icon: '⚙️' },
-  { value: 'RichText', label: 'Rich Text', icon: '📝' },
-  { value: 'ProjectGrid', label: 'Project Grid', icon: '🗂️' },
-  { value: 'SkillMatrix', label: 'Skill Matrix', icon: '⚡' },
-  { value: 'ContactForm', label: 'Contact Form', icon: '📧' },
-  { value: 'TestimonialSlider', label: 'Testimonials', icon: '💬' },
-];
-
-// Default content for each block type
-const DEFAULT_CONTENT = {
-  HeroHeader: { title: 'Welcome', subtitle: 'Your subtitle here', backgroundImage: '' },
-  WorkProcess: { steps: [{ title: '', description: '' }] },
-  RichText: { html: '<p>Your content here...</p>' },
-  ProjectGrid: { title: 'My Projects', items: [] },
-  SkillMatrix: { skills: [] },
-  ContactForm: { fields: ['name', 'email', 'message'], recipients: [] },
-  TestimonialSlider: { testimonials: [] },
-};
+import { BLOCK_REGISTRY } from './blocks/registry';
 
 export function BlockEditor({ pageId, blocks: initialBlocks = [], onBlocksChange }) {
   const [blocks, setBlocks] = useState(initialBlocks);
@@ -34,7 +14,7 @@ export function BlockEditor({ pageId, blocks: initialBlocks = [], onBlocksChange
         page_id: pageId,
         block_type: type,
         title: '',
-        content: DEFAULT_CONTENT[type] || {},
+        content: BLOCK_REGISTRY[type]?.defaultContent || {},
       });
       const newBlocks = [...blocks, res.data];
       setBlocks(newBlocks);
@@ -58,7 +38,7 @@ export function BlockEditor({ pageId, blocks: initialBlocks = [], onBlocksChange
   };
 
   const deleteBlock = async (id) => {
-    if (!confirm('Delete this block?')) return;
+    if (!window.confirm('Delete this block?')) return;
     try {
       await blocksApi.delete(id);
       const newBlocks = blocks.filter(b => b.id !== id);
@@ -86,22 +66,25 @@ export function BlockEditor({ pageId, blocks: initialBlocks = [], onBlocksChange
   return (
     <div className="block-editor">
       <div className="blocks-list">
-        {blocks.map((block, index) => (
-          <div key={block.id} className={`block-item block-${block.block_type?.toLowerCase()}`}>
-            <div className="block-header">
-              <span className="block-type">{block.block_type}</span>
-              <div className="block-actions">
-                <button onClick={() => moveBlock(index, -1)} disabled={index === 0}>↑</button>
-                <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}>↓</button>
-                <button onClick={() => setEditingBlock(block)}>Edit</button>
-                <button onClick={() => deleteBlock(block.id)} className="btn-danger">Delete</button>
+        {blocks.map((block, index) => {
+          const registryEntry = BLOCK_REGISTRY[block.block_type];
+          return (
+            <div key={block.id} className={`block-item block-${block.block_type?.toLowerCase()}`}>
+              <div className="block-header">
+                <span className="block-type">{registryEntry?.icon} {registryEntry?.label || block.block_type}</span>
+                <div className="block-actions">
+                  <button onClick={() => moveBlock(index, -1)} disabled={index === 0}>↑</button>
+                  <button onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1}>↓</button>
+                  <button onClick={() => setEditingBlock(block)}>Edit</button>
+                  <button onClick={() => deleteBlock(block.id)} className="btn-danger">Delete</button>
+                </div>
+              </div>
+              <div className="block-preview">
+                {registryEntry ? registryEntry.preview(block) : <div className="preview-generic">{block.block_type}</div>}
               </div>
             </div>
-            <div className="block-preview">
-              {renderBlockPreview(block)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
         
         <div className="add-block-menu">
           <button onClick={() => setShowAddMenu(!showAddMenu)} className="btn-primary">
@@ -109,9 +92,9 @@ export function BlockEditor({ pageId, blocks: initialBlocks = [], onBlocksChange
           </button>
           {showAddMenu && (
             <div className="block-type-menu">
-              {BLOCK_TYPES.map(type => (
-                <button key={type.value} onClick={() => addBlock(type.value)}>
-                  {type.icon} {type.label}
+              {Object.entries(BLOCK_REGISTRY).map(([type, config]) => (
+                <button key={type} onClick={() => addBlock(type)}>
+                  {config.icon} {config.label}
                 </button>
               ))}
             </div>
@@ -140,10 +123,13 @@ function BlockForm({ block, onSave, onClose }) {
     onSave(block.id, { title, content, status });
   };
 
+  const registryEntry = BLOCK_REGISTRY[block.block_type];
+  const EditorComponent = registryEntry?.Edit;
+
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <h3>Edit {block.block_type}</h3>
+        <h3>Edit {registryEntry?.label || block.block_type}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Title</label>
@@ -159,7 +145,20 @@ function BlockForm({ block, onSave, onClose }) {
             </select>
           </div>
 
-          <ContentEditor type={block.block_type} content={content} onChange={setContent} />
+          {EditorComponent ? (
+            <EditorComponent content={content} onChange={setContent} />
+          ) : (
+            <div className="form-group">
+              <label>JSON Content</label>
+              <textarea 
+                value={JSON.stringify(content, null, 2)} 
+                onChange={e => {
+                  try { setContent(JSON.parse(e.target.value)); } catch {}
+                }} 
+                rows={6}
+              />
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="button" onClick={onClose}>Cancel</button>
@@ -169,150 +168,6 @@ function BlockForm({ block, onSave, onClose }) {
       </div>
     </div>
   );
-}
-
-function ContentEditor({ type, content, onChange }) {
-  switch (type) {
-    case 'HeroHeader':
-      return (
-        <>
-          <div className="form-group">
-            <label>Subtitle</label>
-            <input 
-              value={content.subtitle || ''} 
-              onChange={e => onChange({ ...content, subtitle: e.target.value })} 
-            />
-          </div>
-          <div className="form-group">
-            <label>Background Image URL</label>
-            <input 
-              value={content.backgroundImage || ''} 
-              onChange={e => onChange({ ...content, backgroundImage: e.target.value })} 
-            />
-          </div>
-        </>
-      );
-    case 'RichText':
-      return (
-        <div className="form-group">
-          <label>HTML Content</label>
-          <textarea 
-            value={content.html || ''} 
-            onChange={e => onChange({ ...content, html: e.target.value })} 
-            rows={6}
-          />
-        </div>
-      );
-    case 'ProjectGrid':
-      return (
-        <div className="form-group">
-          <label>Projects (one per line: title|description)</label>
-          <textarea 
-            value={(content.items || []).map(i => `${i.title}|${i.description}`).join('\n')}
-            onChange={e => onChange({ 
-              ...content, 
-              items: e.target.value.split('\n').filter(Boolean).map(line => {
-                const [title, description] = line.split('|');
-                return { title, description };
-              })
-            })} 
-            rows={6}
-          />
-        </div>
-      );
-    case 'WorkProcess':
-      return (
-        <div className="form-group">
-          <label>Work Process Steps</label>
-          {(content.steps || []).map((step, index) => (
-            <div key={index} className="step-editor" style={{ marginBottom: '10px', padding: '10px', border: '1px solid #ccc' }}>
-              <input 
-                placeholder="Step Title"
-                value={step.title || ''} 
-                onChange={e => {
-                  const newSteps = [...(content.steps || [])];
-                  newSteps[index] = { ...step, title: e.target.value };
-                  onChange({ ...content, steps: newSteps });
-                }} 
-                style={{ display: 'block', marginBottom: '5px' }}
-              />
-              <textarea 
-                placeholder="Step Description"
-                value={step.description || ''} 
-                onChange={e => {
-                  const newSteps = [...(content.steps || [])];
-                  newSteps[index] = { ...step, description: e.target.value };
-                  onChange({ ...content, steps: newSteps });
-                }} 
-                rows={2}
-                style={{ display: 'block', width: '100%', marginBottom: '5px' }}
-              />
-              <button 
-                type="button" 
-                onClick={() => {
-                  const newSteps = [...(content.steps || [])];
-                  newSteps.splice(index, 1);
-                  onChange({ ...content, steps: newSteps });
-                }}
-                className="btn-danger"
-              >
-                Remove Step
-              </button>
-            </div>
-          ))}
-          <button 
-            type="button" 
-            onClick={() => {
-              const newSteps = [...(content.steps || []), { title: '', description: '' }];
-              onChange({ ...content, steps: newSteps });
-            }}
-          >
-            + Add Step
-          </button>
-        </div>
-      );
-    case 'SkillMatrix':
-      return (
-        <div className="form-group">
-          <label>Skills (comma separated)</label>
-          <input 
-            value={(content.skills || []).join(', ')} 
-            onChange={e => onChange({ ...content, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} 
-          />
-        </div>
-      );
-    default:
-      return (
-        <div className="form-group">
-          <label>JSON Content</label>
-          <textarea 
-            value={JSON.stringify(content, null, 2)} 
-            onChange={e => {
-              try { onChange(JSON.parse(e.target.value)); } catch {}
-            }} 
-            rows={6}
-          />
-        </div>
-      );
-  }
-}
-
-function renderBlockPreview(block) {
-  const { block_type, title, content } = block;
-  switch (block_type) {
-    case 'HeroHeader':
-      return <div className="preview-hero"><h3>{title || content?.title}</h3><p>{content?.subtitle}</p></div>;
-    case 'RichText':
-      return <div className="preview-text" dangerouslySetInnerHTML={{ __html: content?.html }} />;
-    case 'ProjectGrid':
-      return <div className="preview-grid">{content?.items?.length || 0} projects</div>;
-    case 'WorkProcess':
-      return <div className="preview-process">{content?.steps?.length || 0} steps</div>;
-    case 'SkillMatrix':
-      return <div className="preview-skills">{(content?.skills || []).join(', ')}</div>;
-    default:
-      return <div className="preview-generic">{block_type}</div>;
-  }
 }
 
 export default BlockEditor;

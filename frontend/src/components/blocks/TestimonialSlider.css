@@ -1,0 +1,23 @@
+.block-testimonials {
+  padding: var(--space-4) 0;
+}
+
+.testimonials {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.testimonials blockquote {
+  padding: var(--space-3);
+  background: var(--bg-hover);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+.testimonials cite {
+  display: block;
+  margin-top: var(--space-2);
+  font-weight: bold;
+  font-style: normal;
+}

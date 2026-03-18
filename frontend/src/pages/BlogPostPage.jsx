@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { collections } from '../api';
 
 export default function BlogPostPage() {
@@ -52,7 +53,7 @@ export default function BlogPostPage() {
         
         <div className="post-content" style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#333' }}>
           {post.content ? (
-            <div dangerouslySetInnerHTML={{ __html: post.content }} />
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content || '') }} />
           ) : (
              <p>{post.body || post.description}</p>
           )}

@@ -1,0 +1,19 @@
+.block-skills {
+  padding: var(--space-3) 0;
+}
+
+.skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.skill-tag {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  padding: 4px 12px;
+  border-radius: var(--radius-xl);
+  font-size: 0.9rem;
+  font-weight: 500;
+}

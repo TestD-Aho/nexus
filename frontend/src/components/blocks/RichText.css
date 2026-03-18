@@ -1,0 +1,7 @@
+.block-richtext {
+  padding: var(--space-3) 0;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.8;
+  font-size: 1.1rem;
+}
